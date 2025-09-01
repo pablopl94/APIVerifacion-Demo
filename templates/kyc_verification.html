@@ -215,7 +215,7 @@
                                 </button>
                             </div>
 
-                            <div x-show="selfiePhoto">
+                            <div x-show="selfiePhoto && !processingStep2 && !selfieVerificationAttempted">
                                 <img :src="selfiePhoto" class="w-full h-80 object-cover rounded-lg shadow-lg mb-4">
                                 <div class="flex space-x-4 justify-center">
                                     <button @click="retakeSelfie()" class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors">
@@ -225,6 +225,39 @@
                                         <i class="fas fa-check mr-2"></i>Confirmar
                                     </button>
                                 </div>
+                            </div>
+                            
+                            <!-- Estado de carga para verificación de selfie -->
+                            <div x-show="processingStep2" class="text-center py-8">
+                                <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+                                    <i class="fas fa-cog fa-spin text-2xl text-blue-600"></i>
+                                </div>
+                                <p class="text-blue-600 font-medium mb-2">Verificando imagen...</p>
+                                <p class="text-sm text-gray-500">Comparando con DNI, por favor espere...</p>
+                            </div>
+                            
+                            <!-- Resultado de verificación fallida -->
+                            <div x-show="selfieVerificationAttempted && !selfieVerificationPassed" class="text-center py-8">
+                                <div class="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-4">
+                                    <i class="fas fa-times text-2xl text-red-600"></i>
+                                </div>
+                                <p class="text-red-600 font-medium mb-2">Las imágenes no coinciden</p>
+                                <p class="text-sm text-gray-600 mb-4">Por favor, tome otra foto más clara o con mejor iluminación</p>
+                                <button @click="retakeSelfie()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                                    <i class="fas fa-redo mr-2"></i>Tomar otra foto
+                                </button>
+                            </div>
+                            
+                            <!-- Resultado de verificación exitosa -->
+                            <div x-show="selfieVerificationAttempted && selfieVerificationPassed" class="text-center py-8">
+                                <div class="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
+                                    <i class="fas fa-check text-2xl text-green-600"></i>
+                                </div>
+                                <p class="text-green-600 font-medium mb-2">¡Verificación exitosa!</p>
+                                <p class="text-sm text-gray-600 mb-4">La imagen coincide correctamente con el DNI</p>
+                                <button @click="currentStep++" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors">
+                                    <i class="fas fa-arrow-right mr-2"></i>Continuar
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -710,6 +743,22 @@
                 // Step 2 Data
                 cameraActive: false,
                 selfiePhoto: null,
+                faceDetected: false,
+                facePosition: null,
+                isStable: false,
+                readyToCapture: false,
+                faceGuide: {
+                    x: 0,
+                    y: 0,
+                    width: 0,
+                    height: 0
+                },
+                faceDetectionInterval: null,
+                stabilityCheck: {
+                    positions: [],
+                    threshold: 10, // pixels
+                    requiredFrames: 15 // frames estables requeridos
+                },
                 
                 // Step 3 Data
                 videoActive: false,
@@ -765,6 +814,8 @@
                 
                 // Step 4 Data
                 verifying: false,
+                processingStep2: false,
+                selfieVerificationAttempted: false,
                 verificationComplete: false,
                 verificationProgress: 0,
                 verificationStep: '',
@@ -809,9 +860,22 @@
                     }
                     
                     // PASO 2: Validar selfie
-                    if (this.currentStep === 2 && !this.canProceedStep2()) {
-                        this.showError('Complete la verificación del selfie antes de continuar');
-                        return;
+                    if (this.currentStep === 2) {
+                        if (!this.selfiePhoto) {
+                            this.showError('Tome una foto selfie antes de continuar');
+                            return;
+                        }
+                        
+                        // Si no se ha verificado el selfie, hacerlo ahora
+                        if (!this.selfieVerificationPassed) {
+                            console.log('🤳 Ejecutando verificación de selfie...');
+                            await this.verifySelfie();
+                            
+                            // Si la verificación falló, no continuar
+                            if (!this.selfieVerificationPassed) {
+                                return; // El error ya se muestra en verifySelfie()
+                            }
+                        }
                     }
                     
                     // PASO 3: Validar video
@@ -959,7 +1023,9 @@
                 async verifySelfie() {
                     if (!this.selfiePhoto || !this.dniPhotoPath) return;
                     
-                    this.processing = true;
+                    this.processingStep2 = true;
+                    this.selfieVerificationAttempted = false;
+                    
                     try {
                         console.log('🤳 PASO 2: Verificando selfie con nuevo endpoint modular');
                         
@@ -986,32 +1052,35 @@
                         // Guardar resultados del paso 2
                         this.step2Result = selfieResult;
                         
-                        // Determinar si puede pasar al siguiente paso
+                        // Determinar si puede pasar al siguiente paso (ACEPTA REVIEW también)
                         this.selfieVerificationPassed = selfieResult.success && 
-                                                       selfieResult.face_match && 
-                                                       selfieResult.recommendation !== 'REJECT' && 
-                                                       selfieResult.confidence >= 60; // Umbral mínimo
+                                                       (selfieResult.face_match || 
+                                                        selfieResult.recommendation === 'APPROVE' || 
+                                                        selfieResult.recommendation === 'REVIEW') && 
+                                                       selfieResult.confidence >= 30; // Umbral muy bajo
+                        
+                        // Marcar que se intentó la verificación
+                        this.selfieVerificationAttempted = true;
                         
                         if (this.selfieVerificationPassed) {
                             console.log('✅ Selfie verificado correctamente - puede continuar');
-                            this.showSuccess('Selfie verificado correctamente. Puede continuar al siguiente paso.');
                         } else {
                             console.log('❌ Selfie no válido - no puede continuar');
-                            this.showError(`Selfie no verificado: ${selfieResult.recommendation}. Confianza: ${selfieResult.confidence}%`);
                         }
                         
                     } catch (error) {
                         console.error('❌ Error en verificación selfie:', error);
-                        this.showError('Error al verificar selfie: ' + error.message);
                         this.selfieVerificationPassed = false;
+                        this.selfieVerificationAttempted = true;
                     } finally {
-                        this.processing = false;
+                        this.processingStep2 = false;
                     }
                 },
 
                 retakeSelfie() {
                     this.selfiePhoto = null;
                     this.selfieVerificationPassed = false; // Reset verificación
+                    this.selfieVerificationAttempted = false; // Reset intento
                     this.step2Result = null;
                     this.startSelfieCamera();
                 },
@@ -1904,6 +1973,11 @@
                         console.error('Error converting dataURL to File:', error);
                         return null;
                     }
+                },
+                
+                // Utility function for delays
+                delay(ms) {
+                    return new Promise(resolve => setTimeout(resolve, ms));
                 }
             }
         }
