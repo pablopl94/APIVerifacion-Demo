@@ -151,12 +151,10 @@
                             <!-- Preview DNI -->
                             <div x-show="dniPhotoPreview" class="mt-4">
                                 <img :src="dniPhotoPreview" class="w-full h-48 object-cover rounded-lg shadow-lg">
-                                <button @click="extractDNIText()" :disabled="processing" 
-                                        class="w-full mt-3 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-400">
-                                    <i class="fas fa-search mr-2"></i>
-                                    <span x-show="!processing">Extraer Datos del DNI</span>
-                                    <span x-show="processing">Procesando...</span>
-                                </button>
+                                <div class="mt-3 p-3 bg-blue-50 rounded-lg text-center">
+                                    <i class="fas fa-info-circle text-blue-600 mr-2"></i>
+                                    <span class="text-blue-800">La validación se realizará automáticamente al continuar</span>
+                                </div>
                             </div>
 
                             <!-- Extracted Text -->
@@ -168,10 +166,13 @@
                     </div>
 
                     <div class="flex justify-end mt-8">
-                        <button @click="nextStep()" :disabled="!canProceedStep1()" 
-                                :class="canProceedStep1() ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'"
+                        <button @click="nextStep()" :disabled="!canProceedStep1() || processing" 
+                                :class="canProceedStep1() && !processing ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'"
                                 class="px-8 py-3 text-white rounded-lg font-medium transition-colors">
-                            Continuar <i class="fas fa-arrow-right ml-2"></i>
+                            <span x-show="!processing">Continuar <i class="fas fa-arrow-right ml-2"></i></span>
+                            <span x-show="processing">
+                                <i class="fas fa-spinner fa-spin mr-2"></i>Validando DNI...
+                            </span>
                         </button>
                     </div>
                 </div>
@@ -198,7 +199,11 @@
 
                         <!-- Camera Controls -->
                         <div class="mt-6 text-center space-y-4">
-                            <div x-show="!cameraActive && !selfiePhoto">
+                            <!-- Botón de prueba de cámara -->
+                            <div x-show="!cameraActive && !selfiePhoto" class="mb-4">
+                                <button @click="testCamera()" class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors mr-2">
+                                    <i class="fas fa-video mr-2"></i>Probar Cámara
+                                </button>
                                 <button @click="startSelfieCamera()" class="bg-green-600 text-white px-8 py-3 rounded-lg hover:bg-green-700 transition-colors">
                                     <i class="fas fa-camera mr-2"></i>Activar Cámara
                                 </button>
@@ -232,108 +237,187 @@
                 </div>
 
                 <!-- PASO 3: Verificación de Vida -->
-                <div x-show="currentStep === 3" class="p-8">
-                    <div class="text-center mb-8">
-                        <i class="fas fa-shield-check text-5xl text-purple-600 mb-4"></i>
-                        <h2 class="text-3xl font-bold text-gray-800 mb-2">Verificación de Vida</h2>
-                        <p class="text-gray-600">Siga las instrucciones en pantalla para demostrar que es una persona real</p>
+                <div x-show="currentStep === 3" class="p-4">
+                    <!-- Header minimalista -->
+                    <div class="text-center mb-6">
+                        <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full mb-3">
+                            <i class="fas fa-shield-check text-2xl text-white"></i>
+                        </div>
+                        <h2 class="text-2xl font-bold text-gray-800 mb-1">Verificación de Identidad</h2>
+                        <p class="text-gray-500 text-sm">Verificación biométrica en tiempo real</p>
                     </div>
 
-                    <div class="max-w-md mx-auto">
-                        <!-- Video Stream -->
-                        <div class="relative bg-gray-100 rounded-lg overflow-hidden shadow-lg">
-                            <video x-ref="recordVideo" autoplay class="w-full h-80 object-cover" 
-                                   style="transform: scaleX(-1);"></video>
-                            
-                            <!-- Recording Indicator -->
-                            <div x-show="recording" class="absolute top-4 left-4 flex items-center bg-red-600 text-white px-3 py-1 rounded-full">
-                                <div class="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></div>
-                                <span class="text-sm font-medium">REC</span>
-                            </div>
-                            
-                            <!-- Timer -->
-                            <div x-show="recording" class="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded-full">
-                                <span x-text="recordingTime" class="text-sm font-mono"></span>
-                            </div>
+                    <!-- Layout Professional: Video + Instrucciones lado a lado -->
+                    <div class="flex flex-col lg:flex-row gap-6 max-w-6xl mx-auto">
+                        
+                        <!-- Panel Izquierdo: Video Principal -->
+                        <div class="lg:w-2/3">
+                            <div class="relative bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl overflow-hidden shadow-2xl">
+                                <!-- Video Stream -->
+                                <video x-ref="recordVideo" autoplay class="w-full h-96 lg:h-[500px] object-cover" 
+                                       style="transform: scaleX(-1);"></video>
+                                
+                                <!-- Status indicators - Esquina superior -->
+                                <div class="absolute top-4 left-4 right-4 flex justify-between items-start z-10">
+                                    <!-- Recording Indicator -->
+                                    <div x-show="recording" class="flex items-center bg-red-500 text-white px-3 py-2 rounded-full shadow-lg">
+                                        <div class="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></div>
+                                        <span class="text-sm font-semibold">GRABANDO</span>
+                                    </div>
+                                    
+                                    <!-- Status general -->
+                                    <div x-show="!recording && videoActive" class="bg-green-500 text-white px-3 py-2 rounded-full shadow-lg">
+                                        <span class="text-sm font-semibold">PREPARADO</span>
+                                    </div>
+                                    
+                                    <!-- Timer -->
+                                    <div x-show="recording" class="bg-black bg-opacity-70 text-white px-4 py-2 rounded-full shadow-lg">
+                                        <span x-text="recordingTime" class="text-sm font-mono font-bold"></span>
+                                    </div>
+                                </div>
 
-                            <!-- Live Instructions Overlay -->
-                            <div x-show="recording && currentInstruction" class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30">
-                                <div class="bg-white rounded-full w-64 h-64 flex flex-col items-center justify-center text-center shadow-lg p-6">
-                                    <div class="text-5xl mb-3" x-text="currentInstruction.icon"></div>
-                                    <h3 class="text-lg font-bold text-gray-800 mb-2" x-text="currentInstruction.title"></h3>
-                                    <p class="text-gray-600 text-sm" x-text="currentInstruction.description"></p>
-                                    <div class="mt-4 bg-blue-100 rounded-full h-2 w-32">
-                                        <div class="bg-blue-600 h-2 rounded-full transition-all duration-1000" :style="`width: ${instructionProgress}%`"></div>
+                                <!-- Guías faciales sutiles - SIN tapar cara -->
+                                <div x-show="videoActive && !recording" class="absolute inset-0 flex items-center justify-center pointer-events-none z-5">
+                                    <!-- Marco facial sutil -->
+                                    <div class="relative">
+                                        <!-- Esquinas del marco (como cámara profesional) -->
+                                        <div class="absolute -top-4 -left-4 w-8 h-8 border-l-4 border-t-4 border-white opacity-80 rounded-tl-lg"></div>
+                                        <div class="absolute -top-4 -right-4 w-8 h-8 border-r-4 border-t-4 border-white opacity-80 rounded-tr-lg"></div>
+                                        <div class="absolute -bottom-4 -left-4 w-8 h-8 border-l-4 border-b-4 border-white opacity-80 rounded-bl-lg"></div>
+                                        <div class="absolute -bottom-4 -right-4 w-8 h-8 border-r-4 border-b-4 border-white opacity-80 rounded-br-lg"></div>
+                                        
+                                        <!-- Área de rostro sugerida -->
+                                        <div class="w-48 h-64 bg-transparent border-2 border-dashed border-white opacity-50 rounded-3xl"></div>
+                                        
+                                        <!-- Texto de posicionamiento - ABAJO del marco -->
+                                        <div class="absolute -bottom-12 left-1/2 transform -translate-x-1/2 text-white text-center">
+                                            <div class="bg-black bg-opacity-60 rounded-full px-4 py-2 text-sm font-medium">
+                                                👤 Posicione su rostro en el marco
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Indicador de progreso de instrucción - ABAJO del video -->
+                                <div x-show="recording && currentInstruction" class="absolute bottom-4 left-4 right-4 z-10">
+                                    <div class="bg-black bg-opacity-70 rounded-xl p-4">
+                                        <div class="flex items-center justify-between text-white mb-2">
+                                            <span class="text-lg font-semibold" x-text="currentInstruction?.title || 'Preparando...'"></span>
+                                            <div class="text-2xl" x-text="currentInstruction?.icon || '⏳'"></div>
+                                        </div>
+                                        <div class="bg-gray-600 rounded-full h-2 mb-1">
+                                            <div class="bg-gradient-to-r from-purple-500 to-indigo-500 h-2 rounded-full transition-all duration-300" 
+                                                 :style="`width: ${instructionProgress}%`"></div>
+                                        </div>
+                                        <p class="text-gray-300 text-sm" x-text="currentInstruction?.description || 'Iniciando verificación...'"></p>
                                     </div>
                                 </div>
                             </div>
+                        </div>
 
-                            <!-- Face Detection Guide -->
-                            <div x-show="videoActive && !recording" class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                <div class="relative">
-                                    <!-- Main face circle -->
-                                    <div class="w-48 h-60 border-4 border-white rounded-full opacity-80 bg-transparent"></div>
-                                    <!-- Face positioning text -->
-                                    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white text-center">
-                                        <div class="text-sm font-medium bg-black bg-opacity-50 rounded-full px-3 py-1">
-                                            👤 Posicione su rostro aquí
+                        <!-- Panel Derecho: Instrucciones y Controles -->
+                        <div class="lg:w-1/3 space-y-6">
+                            
+                            <!-- Estado actual -->
+                            <div x-show="!videoActive && !recordedVideo" class="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-6 border border-purple-100">
+                                <h3 class="font-bold text-purple-800 mb-3 flex items-center">
+                                    <i class="fas fa-video mr-2"></i>
+                                    Preparar Cámara
+                                </h3>
+                                <p class="text-purple-700 text-sm mb-4">Active su cámara para comenzar la verificación biométrica en tiempo real.</p>
+                                <button @click="startVideoCamera()" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg">
+                                    <i class="fas fa-camera mr-2"></i>Activar Cámara
+                                </button>
+                            </div>
+
+                            <!-- Instrucciones previas -->
+                            <div x-show="videoActive && !recording && !recordedVideo" class="bg-blue-50 rounded-xl p-6 border border-blue-200">
+                                <h3 class="font-bold text-blue-800 mb-4 flex items-center">
+                                    <i class="fas fa-list-check mr-2"></i>
+                                    Instrucciones
+                                </h3>
+                                <div class="space-y-3">
+                                    <div class="flex items-start">
+                                        <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold mr-3 mt-0.5">1</div>
+                                        <p class="text-blue-700 text-sm">Posicione su rostro dentro del marco</p>
+                                    </div>
+                                    <div class="flex items-start">
+                                        <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold mr-3 mt-0.5">2</div>
+                                        <p class="text-blue-700 text-sm">Siga las instrucciones en tiempo real</p>
+                                    </div>
+                                    <div class="flex items-start">
+                                        <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold mr-3 mt-0.5">3</div>
+                                        <p class="text-blue-700 text-sm">Realice movimientos naturales y claros</p>
+                                    </div>
+                                    <div class="flex items-start">
+                                        <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold mr-3 mt-0.5">4</div>
+                                        <p class="text-blue-700 text-sm">El proceso dura aproximadamente 15 segundos</p>
+                                    </div>
+                                </div>
+                                
+                                <button @click="startLivenessRecording()" class="w-full mt-6 bg-gradient-to-r from-red-500 to-pink-500 text-white py-3 rounded-lg font-semibold hover:from-red-600 hover:to-pink-600 transition-all shadow-lg">
+                                    <i class="fas fa-shield-check mr-2"></i>Iniciar Verificación
+                                </button>
+                            </div>
+
+                            <!-- Status durante grabación -->
+                            <div x-show="recording && !currentInstruction" class="bg-green-50 rounded-xl p-6 border border-green-200">
+                                <div class="text-center">
+                                    <div class="inline-flex items-center justify-center w-12 h-12 bg-green-100 rounded-full mb-3">
+                                        <i class="fas fa-spinner fa-spin text-green-600 text-xl"></i>
+                                    </div>
+                                    <h3 class="font-bold text-green-800 mb-2">Preparando Verificación</h3>
+                                    <p class="text-green-700 text-sm">Manténgase en posición mientras iniciamos el análisis...</p>
+                                </div>
+                            </div>
+
+                            <!-- Próxima instrucción -->
+                            <div x-show="recording && currentInstruction" class="bg-white rounded-xl p-6 border-2 border-purple-200 shadow-lg">
+                                <div class="text-center">
+                                    <div class="text-4xl mb-3" x-text="currentInstruction?.icon || '⏳'"></div>
+                                    <h3 class="font-bold text-gray-800 mb-2" x-text="currentInstruction?.title || 'Cargando...'"></h3>
+                                    <p class="text-gray-600 text-sm mb-4" x-text="currentInstruction?.description || 'Preparando instrucción...'"></p>
+                                    
+                                    <!-- Progress ring -->
+                                    <div class="relative w-16 h-16 mx-auto">
+                                        <svg class="w-16 h-16 transform -rotate-90" viewBox="0 0 64 64">
+                                            <circle cx="32" cy="32" r="28" stroke-width="4" stroke="#e5e7eb" fill="none"></circle>
+                                            <circle cx="32" cy="32" r="28" stroke-width="4" stroke="#8b5cf6" fill="none"
+                                                    :stroke-dasharray="`${instructionProgress * 1.75} 175`"
+                                                    class="transition-all duration-300"></circle>
+                                        </svg>
+                                        <div class="absolute inset-0 flex items-center justify-center">
+                                            <span class="text-xs font-bold text-purple-600" x-text="`${Math.round(instructionProgress)}%`"></span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <!-- Video Controls -->
-                        <div class="mt-6 text-center space-y-4">
-                            <div x-show="!videoActive && !recordedVideo">
-                                <button @click="startVideoCamera()" class="bg-purple-600 text-white px-8 py-3 rounded-lg hover:bg-purple-700 transition-colors">
-                                    <i class="fas fa-video mr-2"></i>Activar Cámara
-                                </button>
-                            </div>
-
-                            <div x-show="videoActive && !recording && !recordedVideo">
-                                <div class="bg-blue-50 rounded-lg p-4 mb-4">
-                                    <h3 class="font-semibold text-blue-800 mb-2">Instrucciones:</h3>
-                                    <ul class="text-blue-700 text-sm space-y-1 text-left">
-                                        <li>• Posicione su rostro en el círculo guía</li>
-                                        <li>• Siga las instrucciones que aparecerán en pantalla</li>
-                                        <li>• Realice los movimientos de forma clara y lenta</li>
-                                        <li>• El proceso durará aproximadamente 20 segundos</li>
-                                        <li>• Se aplicarán transformaciones como en el análisis real</li>
-                                    </ul>
-                                </div>
-                                <button @click="startLivenessRecording()" class="bg-red-600 text-white px-8 py-3 rounded-lg hover:bg-red-700 transition-colors">
-                                    <i class="fas fa-shield-check mr-2"></i>Iniciar Verificación de Vida
-                                </button>
-                            </div>
-
-                            <div x-show="recording && !currentInstruction">
-                                <div class="bg-green-50 rounded-lg p-4">
-                                    <div class="flex items-center justify-center">
-                                        <i class="fas fa-spinner fa-spin text-green-600 mr-2"></i>
-                                        <span class="text-green-800 font-medium">Preparando verificación...</span>
+                            <!-- Resultado final -->
+                            <div x-show="recordedVideo" class="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
+                                <div class="text-center mb-4">
+                                    <div class="inline-flex items-center justify-center w-12 h-12 bg-green-100 rounded-full mb-3">
+                                        <i class="fas fa-check text-green-600 text-xl"></i>
                                     </div>
+                                    <h3 class="font-bold text-green-800 mb-2">¡Verificación Completada!</h3>
+                                    <p class="text-green-700 text-sm">Su identidad ha sido verificada exitosamente</p>
                                 </div>
-                            </div>
-
-                            <div x-show="recordedVideo">
-                                <div class="bg-green-50 rounded-lg p-4 mb-4">
-                                    <div class="flex items-center justify-center">
-                                        <i class="fas fa-check-circle text-green-600 mr-2"></i>
-                                        <span class="text-green-800 font-medium">Verificación de vida completada exitosamente</span>
-                                    </div>
-                                </div>
-                                <video :src="recordedVideo" controls class="w-full h-80 rounded-lg shadow-lg mb-4"></video>
-                                <div class="flex space-x-4 justify-center">
-                                    <button @click="retakeVideo()" class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors">
-                                        <i class="fas fa-redo mr-2"></i>Repetir Verificación
+                                
+                                <div class="flex space-x-3">
+                                    <button @click="retakeVideo()" class="flex-1 bg-gray-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-gray-700 transition-colors">
+                                        <i class="fas fa-redo mr-1"></i>Repetir
                                     </button>
-                                    <button @click="nextStep()" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors">
-                                        <i class="fas fa-check mr-2"></i>Continuar
+                                    <button @click="nextStep()" class="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white py-2 rounded-lg text-sm font-medium hover:from-green-700 hover:to-emerald-700 transition-all">
+                                        <i class="fas fa-check mr-1"></i>Continuar
                                     </button>
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Video de resultado (cuando se completa) -->
+                    <div x-show="recordedVideo" class="max-w-2xl mx-auto mt-6">
+                        <video :src="recordedVideo" controls class="w-full h-64 rounded-xl shadow-lg"></video>
                     </div>
 
                     <div class="flex justify-between mt-8">
@@ -610,6 +694,19 @@
                 dniPhotoPath: null,
                 extractedText: '',
                 
+                // GPT-4 Smart Analysis Results (legacy)
+                gptVerification: null,
+                gptExtractedData: null,
+                gptDetails: '',
+                
+                // NUEVO: Step-by-step verification results
+                dniValidationPassed: false,
+                selfieVerificationPassed: false,
+                livenessVerificationPassed: false,
+                step1Result: null,
+                step2Result: null,
+                step3Result: null,
+                
                 // Step 2 Data
                 cameraActive: false,
                 selfiePhoto: null,
@@ -690,7 +787,39 @@
                     return 'step-inactive';
                 },
 
-                nextStep() {
+                async nextStep() {
+                    // PASO 1: Validar DNI automáticamente
+                    if (this.currentStep === 1) {
+                        if (!this.canProceedStep1()) {
+                            this.showError('Complete todos los campos obligatorios y suba la foto del DNI');
+                            return;
+                        }
+                        
+                        // Si no se ha validado aún, hacerlo automáticamente
+                        if (!this.dniValidationPassed) {
+                            console.log('🚀 Validando DNI automáticamente...');
+                            await this.extractDNIText();
+                            
+                            // Si la validación falló, no continuar
+                            if (!this.dniValidationPassed) {
+                                this.showError('La validación del DNI no fue exitosa. Revise los datos e intente nuevamente.');
+                                return;
+                            }
+                        }
+                    }
+                    
+                    // PASO 2: Validar selfie
+                    if (this.currentStep === 2 && !this.canProceedStep2()) {
+                        this.showError('Complete la verificación del selfie antes de continuar');
+                        return;
+                    }
+                    
+                    // PASO 3: Validar video
+                    if (this.currentStep === 3 && !this.canProceedStep3()) {
+                        this.showError('Complete la verificación del video antes de continuar');
+                        return;
+                    }
+                    
                     if (this.currentStep === 3) {
                         this.startVerification();
                     }
@@ -719,38 +848,68 @@
                     
                     this.processing = true;
                     try {
-                        // 1. Upload image to server
-                        const formData = new FormData();
-                        formData.append('image', this.dniPhotoFile);
+                        console.log('📋 PASO 1: Validando DNI con nuevo endpoint modular');
                         
-                        const uploadResponse = await fetch('/upload', {
+                        // Usar el nuevo endpoint modular /kyc/validate-dni
+                        const formData = new FormData();
+                        formData.append('firstName', this.userData.firstName);
+                        formData.append('lastName', this.userData.lastName);
+                        formData.append('dni', this.userData.dni);
+                        formData.append('birthDate', this.userData.birthDate);
+                        formData.append('address', this.userData.address);
+                        formData.append('dniImageFront', this.dniPhotoFile);
+                        
+                        const dniResponse = await fetch('/kyc/validate-dni', {
                             method: 'POST',
                             body: formData
                         });
                         
-                        if (!uploadResponse.ok) {
-                            throw new Error('Error al subir la imagen');
+                        if (!dniResponse.ok) {
+                            throw new Error('Error en validación de DNI');
                         }
                         
-                        const uploadData = await uploadResponse.json();
-                        this.dniPhotoPath = uploadData.path; // Save DNI path for later comparison
+                        const dniResult = await dniResponse.json();
+                        console.log('📋 Resultado validación DNI:', dniResult);
                         
-                        // 2. Extract text using real OCR API
-                        const ocrResponse = await fetch(`/textImage?known=${encodeURIComponent(uploadData.path)}`);
+                        // Guardar resultados del paso 1
+                        this.step1Result = dniResult;
+                        this.dniPhotoPath = dniResult.dni_front_path;
                         
-                        if (!ocrResponse.ok) {
-                            throw new Error('Error en el procesamiento OCR');
+                        // Mostrar texto extraído para debugging
+                        this.extractedText = dniResult.extracted_text || 'Datos extraídos con GPT-4 Vision';
+                        
+                        // Guardar datos GPT para mostrar después
+                        if (dniResult.success) {
+                            this.gptVerification = {
+                                name_match: dniResult.data_matches?.name || false,
+                                dni_match: dniResult.data_matches?.dni || false,
+                                birthdate_match: dniResult.data_matches?.birthdate || false,
+                                address_match: dniResult.data_matches?.address || false,
+                                overall_confidence: dniResult.confidence || 0,
+                                recommendation: dniResult.recommendation || 'REVIEW'
+                            };
+                            
+                            this.gptExtractedData = dniResult.extracted_data || {};
+                            this.gptDetails = dniResult.details || 'Análisis completado con GPT-4 Vision';
                         }
                         
-                        this.extractedText = await ocrResponse.text();
+                        // Determinar si puede pasar al siguiente paso
+                        this.dniValidationPassed = dniResult.success && 
+                                                   dniResult.recommendation !== 'REJECT' && 
+                                                   dniResult.confidence >= 60; // Umbral mínimo
                         
-                        if (!this.extractedText.trim()) {
-                            this.extractedText = 'No se pudo extraer texto de la imagen. Verifique que la imagen sea clara y contenga texto legible.';
+                        if (this.dniValidationPassed) {
+                            console.log('✅ DNI validado correctamente - puede continuar');
+                            this.showSuccess('DNI validado correctamente. Puede continuar al siguiente paso.');
+                        } else {
+                            console.log('❌ DNI no válido - no puede continuar');
+                            this.showError(`DNI no validado: ${dniResult.recommendation}. Confianza: ${dniResult.confidence}%`);
                         }
                         
                     } catch (error) {
-                        this.showError('Error al procesar la imagen del DNI: ' + error.message);
-                        console.error('OCR Error:', error);
+                        console.error('❌ Error en validación DNI:', error);
+                        this.showError('Error al validar DNI: ' + error.message);
+                        this.dniValidationPassed = false;
                     } finally {
                         this.processing = false;
                     }
@@ -763,7 +922,7 @@
                            this.userData.sex &&
                            this.userData.birthDate && 
                            this.userData.address &&
-                           this.dniPhotoFile;
+                           this.dniPhotoFile; // Solo requiere que todos los campos estén completos
                 },
 
                 // Step 2 Functions
@@ -779,7 +938,7 @@
                     }
                 },
 
-                takeSelfie() {
+                async takeSelfie() {
                     const video = this.$refs.selfieVideo;
                     const canvas = this.$refs.selfieCanvas;
                     const context = canvas.getContext('2d');
@@ -792,24 +951,125 @@
                     
                     this.selfiePhoto = canvas.toDataURL('image/jpeg');
                     this.stopCamera(video);
+                    
+                    // NUEVO: Verificar automáticamente el selfie con endpoint modular
+                    await this.verifySelfie();
+                },
+
+                async verifySelfie() {
+                    if (!this.selfiePhoto || !this.dniPhotoPath) return;
+                    
+                    this.processing = true;
+                    try {
+                        console.log('🤳 PASO 2: Verificando selfie con nuevo endpoint modular');
+                        
+                        // Convertir selfie a archivo
+                        const selfieFile = this.dataURLtoFile(this.selfiePhoto, 'selfie.jpg');
+                        
+                        // Usar el nuevo endpoint modular /kyc/verify-selfie
+                        const formData = new FormData();
+                        formData.append('dniImagePath', this.dniPhotoPath);
+                        formData.append('selfieImage', selfieFile);
+                        
+                        const selfieResponse = await fetch('/kyc/verify-selfie', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        if (!selfieResponse.ok) {
+                            throw new Error('Error en verificación de selfie');
+                        }
+                        
+                        const selfieResult = await selfieResponse.json();
+                        console.log('🤳 Resultado verificación selfie:', selfieResult);
+                        
+                        // Guardar resultados del paso 2
+                        this.step2Result = selfieResult;
+                        
+                        // Determinar si puede pasar al siguiente paso
+                        this.selfieVerificationPassed = selfieResult.success && 
+                                                       selfieResult.face_match && 
+                                                       selfieResult.recommendation !== 'REJECT' && 
+                                                       selfieResult.confidence >= 60; // Umbral mínimo
+                        
+                        if (this.selfieVerificationPassed) {
+                            console.log('✅ Selfie verificado correctamente - puede continuar');
+                            this.showSuccess('Selfie verificado correctamente. Puede continuar al siguiente paso.');
+                        } else {
+                            console.log('❌ Selfie no válido - no puede continuar');
+                            this.showError(`Selfie no verificado: ${selfieResult.recommendation}. Confianza: ${selfieResult.confidence}%`);
+                        }
+                        
+                    } catch (error) {
+                        console.error('❌ Error en verificación selfie:', error);
+                        this.showError('Error al verificar selfie: ' + error.message);
+                        this.selfieVerificationPassed = false;
+                    } finally {
+                        this.processing = false;
+                    }
                 },
 
                 retakeSelfie() {
                     this.selfiePhoto = null;
+                    this.selfieVerificationPassed = false; // Reset verificación
+                    this.step2Result = null;
                     this.startSelfieCamera();
+                },
+
+                canProceedStep2() {
+                    return this.selfiePhoto && 
+                           this.selfieVerificationPassed; // NUEVO: requiere verificación exitosa del selfie
                 },
 
                 // Step 3 Functions
                 async startVideoCamera() {
                     try {
+                        // Verificar si getUserMedia está disponible
+                        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                            throw new Error('Tu navegador no soporta acceso a la cámara. Usa Chrome, Firefox, Safari o Edge.');
+                        }
+
+                        // Verificar permisos de cámara
+                        const permissions = await navigator.permissions.query({ name: 'camera' });
+                        if (permissions.state === 'denied') {
+                            throw new Error('Permisos de cámara denegados. Habilita la cámara en la configuración del navegador.');
+                        }
+
+                        console.log('📹 Iniciando cámara para video...');
                         const stream = await navigator.mediaDevices.getUserMedia({ 
-                            video: { width: 640, height: 480 },
+                            video: { 
+                                width: { ideal: 640, min: 320 },
+                                height: { ideal: 480, min: 240 },
+                                facingMode: 'user' // Cámara frontal
+                            },
                             audio: true
                         });
+                        
                         this.$refs.recordVideo.srcObject = stream;
                         this.videoActive = true;
+                        console.log('✅ Cámara de video iniciada correctamente');
+                        
                     } catch (error) {
-                        this.showError('No se pudo acceder a la cámara');
+                        console.error('❌ Error iniciando cámara de video:', error);
+                        
+                        let errorMessage = 'No se pudo acceder a la cámara';
+                        
+                        if (error.name === 'NotAllowedError') {
+                            errorMessage = 'Permisos de cámara denegados. Habilita la cámara en tu navegador.';
+                        } else if (error.name === 'NotFoundError') {
+                            errorMessage = 'No se encontró ninguna cámara conectada.';
+                        } else if (error.name === 'NotReadableError') {
+                            errorMessage = 'La cámara está siendo usada por otra aplicación.';
+                        } else if (error.name === 'OverconstrainedError') {
+                            errorMessage = 'La cámara no soporta la resolución solicitada.';
+                        } else if (error.name === 'SecurityError') {
+                            errorMessage = 'Acceso a la cámara bloqueado por seguridad. Usa HTTPS.';
+                        } else if (error.message.includes('HTTPS')) {
+                            errorMessage = 'Se requiere HTTPS para acceder a la cámara.';
+                        }
+                        
+                        this.showError(errorMessage);
+                        this.videoActive = false;
                     }
                 },
 
@@ -865,7 +1125,7 @@
                     }, 100);
                 },
 
-                stopLivenessRecording() {
+                async stopLivenessRecording() {
                     this.currentInstruction = null;
                     if (this.instructionTimer) {
                         clearInterval(this.instructionTimer);
@@ -876,17 +1136,103 @@
                         this.recording = false;
                         this.stopRecordingTimer();
                         this.stopCamera(this.$refs.recordVideo);
+                        
+                        // NUEVO: Verificar automáticamente el video con endpoint modular
+                        // Esperar un poco para que se complete la creación del blob
+                        setTimeout(async () => {
+                            await this.verifyLiveness();
+                        }, 1000);
+                    }
+                },
+
+                async verifyLiveness() {
+                    if (!this.recordedVideo || !this.selfiePhoto || !this.dniPhotoPath) return;
+                    
+                    this.processing = true;
+                    try {
+                        console.log('🎥 PASO 3: Verificando liveness con nuevo endpoint modular');
+                        
+                        // Convertir video blob a archivo
+                        const videoBlob = await fetch(this.recordedVideo).then(res => res.blob());
+                        const videoFile = new File([videoBlob], 'verification_video.mp4', { type: 'video/mp4' });
+                        
+                        // Obtener path del selfie (necesario para la verificación)
+                        const selfieFile = this.dataURLtoFile(this.selfiePhoto, 'selfie.jpg');
+                        const selfieFormData = new FormData();
+                        selfieFormData.append('image', selfieFile);
+                        
+                        const selfieUpload = await fetch('/upload', {
+                            method: 'POST',
+                            body: selfieFormData
+                        });
+                        
+                        if (!selfieUpload.ok) {
+                            throw new Error('Error al subir selfie para verificación');
+                        }
+                        
+                        const selfieData = await selfieUpload.json();
+                        const selfieImagePath = selfieData.path;
+                        
+                        // Usar el nuevo endpoint modular /kyc/verify-liveness
+                        const formData = new FormData();
+                        formData.append('selfieImagePath', selfieImagePath);
+                        formData.append('dniImagePath', this.dniPhotoPath);
+                        formData.append('verificationVideo', videoFile);
+                        
+                        const livenessResponse = await fetch('/kyc/verify-liveness', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        if (!livenessResponse.ok) {
+                            throw new Error('Error en verificación de liveness');
+                        }
+                        
+                        const livenessResult = await livenessResponse.json();
+                        console.log('🎥 Resultado verificación liveness:', livenessResult);
+                        
+                        // Guardar resultados del paso 3
+                        this.step3Result = livenessResult;
+                        
+                        // Determinar si puede pasar al siguiente paso
+                        this.livenessVerificationPassed = livenessResult.success && 
+                                                          livenessResult.is_live_person && 
+                                                          livenessResult.matches_selfie && 
+                                                          livenessResult.recommendation !== 'REJECT' && 
+                                                          livenessResult.confidence >= 60; // Umbral mínimo
+                        
+                        if (this.livenessVerificationPassed) {
+                            console.log('✅ Liveness verificado correctamente - puede continuar');
+                            this.showSuccess('Video de vida verificado correctamente. Puede ver el resultado final.');
+                        } else {
+                            console.log('❌ Liveness no válido - no puede continuar');
+                            this.showError(`Video no verificado: ${livenessResult.recommendation}. Confianza: ${livenessResult.confidence}%`);
+                        }
+                        
+                    } catch (error) {
+                        console.error('❌ Error en verificación liveness:', error);
+                        this.showError('Error al verificar video: ' + error.message);
+                        this.livenessVerificationPassed = false;
+                    } finally {
+                        this.processing = false;
                     }
                 },
 
                 retakeVideo() {
                     this.recordedVideo = null;
+                    this.livenessVerificationPassed = false; // Reset verificación
+                    this.step3Result = null;
                     this.currentInstruction = null;
                     this.currentInstructionIndex = 0;
                     if (this.instructionTimer) {
                         clearInterval(this.instructionTimer);
                     }
                     this.startVideoCamera();
+                },
+
+                canProceedStep3() {
+                    return this.recordedVideo && 
+                           this.livenessVerificationPassed; // NUEVO: requiere verificación exitosa del video
                 },
 
                 startRecordingTimer() {
@@ -917,126 +1263,138 @@
                     this.videoActive = false;
                 },
 
-                // Step 4 Functions
+                // Step 4 Functions - NUEVO: Solo muestra resultados de los pasos anteriores
                 async startVerification() {
+                    console.log('📊 PASO 4: Mostrando resultado final de todos los pasos');
+                    
                     this.verifying = true;
                     this.verificationProgress = 0;
-                    this.verificationStep = 'Iniciando verificación...';
                     const verificationStartTime = Date.now();
                     
                     try {
-                        // Step 1: Upload selfie and video files
-                        this.verificationProgress = 20;
-                        this.verificationStep = 'Subiendo archivos...';
+                        // Simular progreso para la animación
+                        this.verificationStep = 'Recopilando resultados...';
+                        this.verificationProgress = 30;
+                        await new Promise(resolve => setTimeout(resolve, 500));
                         
-                        const selfieFile = this.dataURLtoFile(this.selfiePhoto, 'selfie.jpg');
+                        this.verificationStep = 'Procesando análisis completo...';
+                        this.verificationProgress = 70;
+                        await new Promise(resolve => setTimeout(resolve, 500));
                         
-                        // Handle video file (blob URL requires async conversion)
-                        let videoFile;
-                        if (this.recordedVideo.startsWith('blob:')) {
-                            const videoBlob = await fetch(this.recordedVideo).then(res => res.blob());
-                            videoFile = new File([videoBlob], 'verification_video.mp4', { type: 'video/mp4' });
-                        } else {
-                            videoFile = this.dataURLtoFile(this.recordedVideo, 'verification_video.mp4');
-                        }
-                        
-                        // Upload selfie
-                        const selfieFormData = new FormData();
-                        selfieFormData.append('image', selfieFile);
-                        const selfieUpload = await fetch('/upload', {
-                            method: 'POST',
-                            body: selfieFormData
-                        });
-                        
-                        if (!selfieUpload.ok) {
-                            throw new Error('Error al subir el selfie');
-                        }
-                        const selfieData = await selfieUpload.json();
-                        
-                        // Upload video
-                        const videoFormData = new FormData();
-                        videoFormData.append('video', videoFile); // Using 'video' field as per server.py
-                        const videoUpload = await fetch('/upload', {
-                            method: 'POST',
-                            body: videoFormData
-                        });
-                        
-                        if (!videoUpload.ok) {
-                            throw new Error('Error al subir el video');
-                        }
-                        const videoData = await videoUpload.json();
-                        
-                        // Step 2: Compare DNI with selfie
-                        this.verificationProgress = 50;
-                        this.verificationStep = 'Comparando DNI con selfie...';
-                        
-                        const dniSelfieResponse = await fetch(`/faceImage?known=${encodeURIComponent(this.dniPhotoPath)}&unknown=${encodeURIComponent(selfieData.path)}`);
-                        const dniMatch = (await dniSelfieResponse.text()) === 'True';
-                        
-                        // Step 3: Compare selfie with video
-                        this.verificationProgress = 80;
-                        this.verificationStep = 'Comparando selfie con video...';
-                        
-                        const selfieVideoResponse = await fetch(`/faceVideo?known=${encodeURIComponent(selfieData.path)}&unknown=${encodeURIComponent(videoData.path)}`);
-                        const videoMatch = (await selfieVideoResponse.text()) === 'True';
-                        
-                        // Step 4: Final result
+                        this.verificationStep = 'Generando resultado final...';
                         this.verificationProgress = 100;
-                        this.verificationStep = 'Finalizando verificación...';
+                        await new Promise(resolve => setTimeout(resolve, 500));
                         
-                        const dataExtracted = this.extractedText && this.extractedText.trim().length > 0;
+                        // Determinar éxito basado en los 3 pasos previos
+                        const dniPassed = this.dniValidationPassed && this.step1Result?.success;
+                        const selfiePassed = this.selfieVerificationPassed && this.step2Result?.success;
+                        const livenessPassed = this.livenessVerificationPassed && this.step3Result?.success;
                         
-                        // Create data comparison
-                        const dataComparison = this.createDataComparison();
+                        const allStepsPassed = dniPassed && selfiePassed && livenessPassed;
                         
-                        const success = dniMatch && videoMatch && dataExtracted;
+                        // Calcular confianza promedio de todos los pasos
+                        let totalConfidence = 0;
+                        let confidenceCount = 0;
                         
-                        // Create detailed error message
+                        if (this.step1Result?.confidence) {
+                            totalConfidence += this.step1Result.confidence;
+                            confidenceCount++;
+                        }
+                        if (this.step2Result?.confidence) {
+                            totalConfidence += this.step2Result.confidence;
+                            confidenceCount++;
+                        }
+                        if (this.step3Result?.confidence) {
+                            totalConfidence += this.step3Result.confidence;
+                            confidenceCount++;
+                        }
+                        
+                        const overallConfidence = confidenceCount > 0 ? Math.round(totalConfidence / confidenceCount) : 0;
+                        
+                        // Crear mensaje de error detallado
                         let errorMessage = '';
-                        if (!success) {
+                        if (!allStepsPassed) {
                             const errors = [];
-                            if (!dniMatch) errors.push('DNI y selfie no coinciden');
-                            if (!videoMatch) errors.push('Selfie no detectado en video');
-                            if (!dataExtracted) errors.push('No se extrajeron datos del DNI');
+                            if (!dniPassed) errors.push('Validación de DNI falló');
+                            if (!selfiePassed) errors.push('Verificación de selfie falló');
+                            if (!livenessPassed) errors.push('Verificación de liveness falló');
                             errorMessage = `Fallos encontrados: ${errors.join(', ')}`;
                         }
                         
+                        // Crear comparación de datos para mostrar (usar resultado del paso 1)
+                        let dataComparison = null;
+                        if (this.step1Result && this.step1Result.data_matches) {
+                            dataComparison = {
+                                name: { 
+                                    input: `${this.userData.lastName}, ${this.userData.firstName}`, 
+                                    extracted: this.step1Result.extracted_data?.name || 'No extraído', 
+                                    match: this.step1Result.data_matches.name 
+                                },
+                                dni: { 
+                                    input: this.userData.dni, 
+                                    extracted: this.step1Result.extracted_data?.dni || 'No extraído', 
+                                    match: this.step1Result.data_matches.dni 
+                                },
+                                birthDate: { 
+                                    input: this.userData.birthDate, 
+                                    extracted: this.step1Result.extracted_data?.birthdate || 'No extraído', 
+                                    match: this.step1Result.data_matches.birthdate 
+                                },
+                                address: { 
+                                    input: this.userData.address, 
+                                    extracted: this.step1Result.extracted_data?.address || 'No extraído', 
+                                    match: this.step1Result.data_matches.address 
+                                },
+                                matchCount: Object.values(this.step1Result.data_matches).filter(Boolean).length,
+                                totalFields: 4,
+                                overallMatch: this.step1Result.recommendation !== 'REJECT',
+                                summary: this.step1Result.details || `Confianza: ${this.step1Result.confidence}%`
+                            };
+                        }
+                        
+                        // Establecer texto extraído del paso 1
+                        if (this.step1Result?.extracted_text) {
+                            this.extractedText = this.step1Result.extracted_text;
+                        }
+                        
+                        // Resultado final
                         this.verificationResult = {
-                            success,
-                            message: success ? 
+                            success: allStepsPassed,
+                            message: allStepsPassed ? 
                                 'Su identidad ha sido verificada exitosamente' : 
                                 errorMessage,
-                            dniMatch,
-                            videoMatch,
-                            dataExtracted,
+                            dniMatch: selfiePassed,  // DNI vs Selfie del paso 2
+                            videoMatch: livenessPassed,  // Selfie vs Video del paso 3
+                            dataExtracted: dniPassed,  // Extracción de datos del paso 1
                             dataComparison,
+                            overallConfidence,
                             debugInfo: {
-                                ocrLength: this.extractedText?.length || 0,
-                                filesUploaded: `DNI: ${this.dniPhotoPath ? '✓' : '✗'}, Selfie: ${selfieData.path ? '✓' : '✗'}, Video: ${videoData.path ? '✓' : '✗'}`,
-                                apiErrors: success ? 'Ninguno' : 'Ver detalles arriba',
+                                step1Result: this.step1Result,
+                                step2Result: this.step2Result,
+                                step3Result: this.step3Result,
+                                stepsStatus: `DNI: ${dniPassed ? '✓' : '✗'}, Selfie: ${selfiePassed ? '✓' : '✗'}, Liveness: ${livenessPassed ? '✓' : '✗'}`,
                                 processingTime: Date.now() - verificationStartTime
                             }
                         };
                         
+                        console.log('📊 Resultado final compilado:', this.verificationResult);
+                        
                     } catch (error) {
-                        // Create data comparison even in error case
-                        const dataComparison = this.createDataComparison();
+                        console.error('❌ Error compilando resultado final:', error);
                         
                         this.verificationResult = {
                             success: false,
-                            message: 'Error durante la verificación: ' + error.message,
+                            message: 'Error procesando resultados finales: ' + error.message,
                             dniMatch: false,
                             videoMatch: false,
                             dataExtracted: false,
-                            dataComparison,
+                            dataComparison: null,
+                            overallConfidence: 0,
                             debugInfo: {
-                                ocrLength: this.extractedText?.length || 0,
-                                filesUploaded: `Error en subida de archivos`,
-                                apiErrors: error.message,
+                                error: error.message,
                                 processingTime: Date.now() - verificationStartTime
                             }
                         };
-                        console.error('Verification Error:', error);
                     } finally {
                         this.verifying = false;
                         this.verificationComplete = true;
@@ -1063,6 +1421,20 @@
                     this.dniPhotoPreview = null;
                     this.dniPhotoPath = null;
                     this.extractedText = '';
+                    
+                    // Reset GPT-4 analysis (legacy)
+                    this.gptVerification = null;
+                    this.gptExtractedData = null;
+                    this.gptDetails = '';
+                    
+                    // NUEVO: Reset step-by-step verification results
+                    this.dniValidationPassed = false;
+                    this.selfieVerificationPassed = false;
+                    this.livenessVerificationPassed = false;
+                    this.step1Result = null;
+                    this.step2Result = null;
+                    this.step3Result = null;
+                    
                     this.selfiePhoto = null;
                     this.recordedVideo = null;
                     
@@ -1073,6 +1445,23 @@
                     if (this.instructionTimer) {
                         clearInterval(this.instructionTimer);
                     }
+                },
+
+                // NUEVO: Funciones de utilidad para mostrar mensajes
+                showSuccess(message) {
+                    console.log('✅ Éxito:', message);
+                    this.errorMessage = ''; // Limpiar errores previos
+                    // Mostrar notificación de éxito temporal (opcional)
+                    // TODO: Implementar notificación de éxito visual si se desea
+                },
+
+                showError(message) {
+                    console.error('❌ Error:', message);
+                    this.errorMessage = message;
+                    // Auto-ocultar después de 8 segundos
+                    setTimeout(() => {
+                        this.errorMessage = '';
+                    }, 8000);
                 },
 
                 createDataComparison() {

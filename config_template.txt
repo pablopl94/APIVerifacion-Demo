@@ -1,0 +1,19 @@
+# INSTRUCCIONES: 
+# 1. Crea un archivo llamado '.env' en la raíz del proyecto
+# 2. Copia este contenido al archivo .env
+# 3. Reemplaza 'tu_api_key_aqui' por tu API key real
+
+# OpenAI API Configuration
+OPENAI_API_KEY=tu_api_key_aqui
+
+# Configuración del modelo
+OPENAI_MODEL=gpt-4
+OPENAI_VISION_MODEL=gpt-4-vision-preview
+
+# Configuración de costos (opcional)
+MAX_TOKENS=500
+TEMPERATURE=0.1
+
+# Flask Configuration
+FLASK_ENV=development
+SECRET_KEY=tu_secret_key_aqui
