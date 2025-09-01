@@ -1,0 +1,1523 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificación de Identidad KYC</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .step-active { @apply bg-blue-600 text-white; }
+        .step-completed { @apply bg-green-600 text-white; }
+        .step-inactive { @apply bg-gray-300 text-gray-600; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-purple-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8" x-data="kycVerification()">
+        
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <div class="inline-flex items-center justify-center w-20 h-20 bg-blue-600 rounded-full mb-4">
+                <i class="fas fa-shield-alt text-3xl text-white"></i>
+            </div>
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">Verificación de Identidad</h1>
+            <p class="text-gray-600 text-lg">Complete el proceso paso a paso para verificar su identidad</p>
+        </div>
+
+        <!-- Progress Steps -->
+        <div class="flex justify-center mb-12">
+            <div class="flex items-center space-x-4">
+                <!-- Step 1 -->
+                <div class="flex items-center">
+                    <div :class="getStepClass(1)" class="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg transition-all duration-300">
+                        <i x-show="currentStep > 1" class="fas fa-check"></i>
+                        <span x-show="currentStep <= 1">1</span>
+                    </div>
+                    <span class="ml-2 text-sm font-medium text-gray-700">Datos y DNI</span>
+                </div>
+                
+                <div class="w-8 h-1 bg-gray-300 rounded"></div>
+                
+                <!-- Step 2 -->
+                <div class="flex items-center">
+                    <div :class="getStepClass(2)" class="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg transition-all duration-300">
+                        <i x-show="currentStep > 2" class="fas fa-check"></i>
+                        <span x-show="currentStep <= 2">2</span>
+                    </div>
+                    <span class="ml-2 text-sm font-medium text-gray-700">Selfie</span>
+                </div>
+                
+                <div class="w-8 h-1 bg-gray-300 rounded"></div>
+                
+                <!-- Step 3 -->
+                <div class="flex items-center">
+                    <div :class="getStepClass(3)" class="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg transition-all duration-300">
+                        <i x-show="currentStep > 3" class="fas fa-check"></i>
+                        <span x-show="currentStep <= 3">3</span>
+                    </div>
+                    <span class="ml-2 text-sm font-medium text-gray-700">Video</span>
+                </div>
+                
+                <div class="w-8 h-1 bg-gray-300 rounded"></div>
+                
+                <!-- Step 4 -->
+                <div class="flex items-center">
+                    <div :class="getStepClass(4)" class="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg transition-all duration-300">
+                        <i x-show="currentStep > 4" class="fas fa-check"></i>
+                        <span x-show="currentStep <= 4">4</span>
+                    </div>
+                    <span class="ml-2 text-sm font-medium text-gray-700">Resultado</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Card -->
+        <div class="max-w-4xl mx-auto">
+            <div class="bg-white rounded-2xl shadow-2xl overflow-hidden">
+                
+                <!-- PASO 1: Datos Personales y DNI -->
+                <div x-show="currentStep === 1" class="p-8">
+                    <div class="text-center mb-8">
+                        <i class="fas fa-user-edit text-5xl text-blue-600 mb-4"></i>
+                        <h2 class="text-3xl font-bold text-gray-800 mb-2">Información Personal</h2>
+                        <p class="text-gray-600">Complete sus datos y suba una foto de su DNI</p>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-8">
+                        <!-- Formulario -->
+                        <div class="space-y-6">
+                            <div class="grid md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Apellidos</label>
+                                    <input x-model="userData.lastName" type="text" placeholder="Ej: García López" 
+                                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Nombre</label>
+                                    <input x-model="userData.firstName" type="text" placeholder="Ej: Juan" 
+                                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                </div>
+                            </div>
+                            
+                            <div class="grid md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Número de DNI</label>
+                                    <input x-model="userData.dni" type="text" placeholder="12345678X" maxlength="9"
+                                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Sexo</label>
+                                    <select x-model="userData.sex" 
+                                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                        <option value="">Seleccionar</option>
+                                        <option value="M">Masculino</option>
+                                        <option value="F">Femenino</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Fecha de nacimiento</label>
+                                <input x-model="userData.birthDate" type="date" 
+                                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Nacionalidad</label>
+                                <input x-model="userData.nationality" type="text" value="ESP" readonly
+                                       class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-600">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Domicilio (Dirección completa)</label>
+                                <textarea x-model="userData.address" placeholder="Ej: Calle Mayor, 123, 2º A, 28001 Madrid" rows="3"
+                                          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Foto DNI -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-4">Foto del DNI (anverso)</label>
+                            <div class="border-2 border-dashed border-blue-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
+                                <i class="fas fa-id-card text-4xl text-blue-400 mb-4"></i>
+                                <p class="text-gray-600 mb-4">Suba una foto clara de su DNI</p>
+                                <input type="file" @change="handleDNIPhoto($event)" accept="image/*" class="hidden" id="dniPhoto">
+                                <label for="dniPhoto" class="bg-blue-600 text-white px-6 py-3 rounded-lg cursor-pointer hover:bg-blue-700 transition-colors inline-block">
+                                    <i class="fas fa-camera mr-2"></i>Seleccionar Foto
+                                </label>
+                            </div>
+                            
+                            <!-- Preview DNI -->
+                            <div x-show="dniPhotoPreview" class="mt-4">
+                                <img :src="dniPhotoPreview" class="w-full h-48 object-cover rounded-lg shadow-lg">
+                                <button @click="extractDNIText()" :disabled="processing" 
+                                        class="w-full mt-3 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-400">
+                                    <i class="fas fa-search mr-2"></i>
+                                    <span x-show="!processing">Extraer Datos del DNI</span>
+                                    <span x-show="processing">Procesando...</span>
+                                </button>
+                            </div>
+
+                            <!-- Extracted Text -->
+                            <div x-show="extractedText" class="mt-4 p-4 bg-gray-50 rounded-lg">
+                                <h4 class="font-semibold text-gray-800 mb-2">Texto extraído:</h4>
+                                <pre x-text="extractedText" class="text-sm text-gray-700 whitespace-pre-wrap"></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end mt-8">
+                        <button @click="nextStep()" :disabled="!canProceedStep1()" 
+                                :class="canProceedStep1() ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'"
+                                class="px-8 py-3 text-white rounded-lg font-medium transition-colors">
+                            Continuar <i class="fas fa-arrow-right ml-2"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- PASO 2: Selfie con Cámara -->
+                <div x-show="currentStep === 2" class="p-8">
+                    <div class="text-center mb-8">
+                        <i class="fas fa-camera text-5xl text-green-600 mb-4"></i>
+                        <h2 class="text-3xl font-bold text-gray-800 mb-2">Captura tu Selfie</h2>
+                        <p class="text-gray-600">Toma una foto de tu rostro para verificar tu identidad</p>
+                    </div>
+
+                    <div class="max-w-md mx-auto">
+                        <!-- Camera Stream -->
+                        <div class="relative bg-gray-100 rounded-lg overflow-hidden shadow-lg">
+                            <video x-ref="selfieVideo" autoplay class="w-full h-80 object-cover" style="transform: scaleX(-1);"></video>
+                            <canvas x-ref="selfieCanvas" class="hidden"></canvas>
+                            
+                            <!-- Overlay Guide -->
+                            <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <div class="w-48 h-64 border-4 border-white rounded-full opacity-30"></div>
+                            </div>
+                        </div>
+
+                        <!-- Camera Controls -->
+                        <div class="mt-6 text-center space-y-4">
+                            <div x-show="!cameraActive && !selfiePhoto">
+                                <button @click="startSelfieCamera()" class="bg-green-600 text-white px-8 py-3 rounded-lg hover:bg-green-700 transition-colors">
+                                    <i class="fas fa-camera mr-2"></i>Activar Cámara
+                                </button>
+                            </div>
+
+                            <div x-show="cameraActive && !selfiePhoto">
+                                <button @click="takeSelfie()" class="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors">
+                                    <i class="fas fa-camera mr-2"></i>Tomar Selfie
+                                </button>
+                            </div>
+
+                            <div x-show="selfiePhoto">
+                                <img :src="selfiePhoto" class="w-full h-80 object-cover rounded-lg shadow-lg mb-4">
+                                <div class="flex space-x-4 justify-center">
+                                    <button @click="retakeSelfie()" class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors">
+                                        <i class="fas fa-redo mr-2"></i>Repetir
+                                    </button>
+                                    <button @click="nextStep()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors">
+                                        <i class="fas fa-check mr-2"></i>Confirmar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between mt-8">
+                        <button @click="previousStep()" class="px-6 py-3 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                            <i class="fas fa-arrow-left mr-2"></i>Anterior
+                        </button>
+                    </div>
+                </div>
+
+                <!-- PASO 3: Verificación de Vida -->
+                <div x-show="currentStep === 3" class="p-8">
+                    <div class="text-center mb-8">
+                        <i class="fas fa-shield-check text-5xl text-purple-600 mb-4"></i>
+                        <h2 class="text-3xl font-bold text-gray-800 mb-2">Verificación de Vida</h2>
+                        <p class="text-gray-600">Siga las instrucciones en pantalla para demostrar que es una persona real</p>
+                    </div>
+
+                    <div class="max-w-md mx-auto">
+                        <!-- Video Stream -->
+                        <div class="relative bg-gray-100 rounded-lg overflow-hidden shadow-lg">
+                            <video x-ref="recordVideo" autoplay class="w-full h-80 object-cover" 
+                                   style="transform: scaleX(-1);"></video>
+                            
+                            <!-- Recording Indicator -->
+                            <div x-show="recording" class="absolute top-4 left-4 flex items-center bg-red-600 text-white px-3 py-1 rounded-full">
+                                <div class="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></div>
+                                <span class="text-sm font-medium">REC</span>
+                            </div>
+                            
+                            <!-- Timer -->
+                            <div x-show="recording" class="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded-full">
+                                <span x-text="recordingTime" class="text-sm font-mono"></span>
+                            </div>
+
+                            <!-- Live Instructions Overlay -->
+                            <div x-show="recording && currentInstruction" class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30">
+                                <div class="bg-white rounded-full w-64 h-64 flex flex-col items-center justify-center text-center shadow-lg p-6">
+                                    <div class="text-5xl mb-3" x-text="currentInstruction.icon"></div>
+                                    <h3 class="text-lg font-bold text-gray-800 mb-2" x-text="currentInstruction.title"></h3>
+                                    <p class="text-gray-600 text-sm" x-text="currentInstruction.description"></p>
+                                    <div class="mt-4 bg-blue-100 rounded-full h-2 w-32">
+                                        <div class="bg-blue-600 h-2 rounded-full transition-all duration-1000" :style="`width: ${instructionProgress}%`"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Face Detection Guide -->
+                            <div x-show="videoActive && !recording" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <div class="relative">
+                                    <!-- Main face circle -->
+                                    <div class="w-48 h-60 border-4 border-white rounded-full opacity-80 bg-transparent"></div>
+                                    <!-- Face positioning text -->
+                                    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white text-center">
+                                        <div class="text-sm font-medium bg-black bg-opacity-50 rounded-full px-3 py-1">
+                                            👤 Posicione su rostro aquí
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Video Controls -->
+                        <div class="mt-6 text-center space-y-4">
+                            <div x-show="!videoActive && !recordedVideo">
+                                <button @click="startVideoCamera()" class="bg-purple-600 text-white px-8 py-3 rounded-lg hover:bg-purple-700 transition-colors">
+                                    <i class="fas fa-video mr-2"></i>Activar Cámara
+                                </button>
+                            </div>
+
+                            <div x-show="videoActive && !recording && !recordedVideo">
+                                <div class="bg-blue-50 rounded-lg p-4 mb-4">
+                                    <h3 class="font-semibold text-blue-800 mb-2">Instrucciones:</h3>
+                                    <ul class="text-blue-700 text-sm space-y-1 text-left">
+                                        <li>• Posicione su rostro en el círculo guía</li>
+                                        <li>• Siga las instrucciones que aparecerán en pantalla</li>
+                                        <li>• Realice los movimientos de forma clara y lenta</li>
+                                        <li>• El proceso durará aproximadamente 20 segundos</li>
+                                        <li>• Se aplicarán transformaciones como en el análisis real</li>
+                                    </ul>
+                                </div>
+                                <button @click="startLivenessRecording()" class="bg-red-600 text-white px-8 py-3 rounded-lg hover:bg-red-700 transition-colors">
+                                    <i class="fas fa-shield-check mr-2"></i>Iniciar Verificación de Vida
+                                </button>
+                            </div>
+
+                            <div x-show="recording && !currentInstruction">
+                                <div class="bg-green-50 rounded-lg p-4">
+                                    <div class="flex items-center justify-center">
+                                        <i class="fas fa-spinner fa-spin text-green-600 mr-2"></i>
+                                        <span class="text-green-800 font-medium">Preparando verificación...</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div x-show="recordedVideo">
+                                <div class="bg-green-50 rounded-lg p-4 mb-4">
+                                    <div class="flex items-center justify-center">
+                                        <i class="fas fa-check-circle text-green-600 mr-2"></i>
+                                        <span class="text-green-800 font-medium">Verificación de vida completada exitosamente</span>
+                                    </div>
+                                </div>
+                                <video :src="recordedVideo" controls class="w-full h-80 rounded-lg shadow-lg mb-4"></video>
+                                <div class="flex space-x-4 justify-center">
+                                    <button @click="retakeVideo()" class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors">
+                                        <i class="fas fa-redo mr-2"></i>Repetir Verificación
+                                    </button>
+                                    <button @click="nextStep()" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors">
+                                        <i class="fas fa-check mr-2"></i>Continuar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between mt-8">
+                        <button @click="previousStep()" class="px-6 py-3 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                            <i class="fas fa-arrow-left mr-2"></i>Anterior
+                        </button>
+                    </div>
+                </div>
+
+                <!-- PASO 4: Verificación y Resultados -->
+                <div x-show="currentStep === 4" class="p-8">
+                    <div class="text-center mb-8">
+                        <i class="fas fa-shield-check text-5xl text-indigo-600 mb-4"></i>
+                        <h2 class="text-3xl font-bold text-gray-800 mb-2">Verificación en Proceso</h2>
+                        <p class="text-gray-600">Analizando y comparando sus datos...</p>
+                    </div>
+
+                    <!-- Processing Animation -->
+                    <div x-show="verifying" class="text-center mb-8">
+                        <div class="inline-flex items-center justify-center w-20 h-20 bg-blue-100 rounded-full mb-4">
+                            <i class="fas fa-cog fa-spin text-3xl text-blue-600"></i>
+                        </div>
+                        <p class="text-blue-600 font-medium">Procesando verificación...</p>
+                        <div class="mt-4 max-w-md mx-auto">
+                            <div class="bg-gray-200 rounded-full h-2">
+                                <div class="bg-blue-600 h-2 rounded-full transition-all duration-1000" :style="`width: ${verificationProgress}%`"></div>
+                            </div>
+                            <p class="text-sm text-gray-600 mt-2" x-text="verificationStep"></p>
+                        </div>
+                    </div>
+
+                    <!-- Results -->
+                    <div x-show="!verifying && verificationComplete">
+                        <div class="max-w-2xl mx-auto">
+                            <!-- Success/Failure Icon -->
+                            <div class="text-center mb-8">
+                                <div :class="verificationResult.success ? 'bg-green-100' : 'bg-red-100'" class="inline-flex items-center justify-center w-24 h-24 rounded-full mb-4">
+                                    <i :class="verificationResult.success ? 'fas fa-check text-green-600' : 'fas fa-times text-red-600'" class="text-4xl"></i>
+                                </div>
+                                <h3 :class="verificationResult.success ? 'text-green-800' : 'text-red-800'" class="text-2xl font-bold mb-2" 
+                                    x-text="verificationResult.success ? 'Verificación Exitosa' : 'Verificación Fallida'"></h3>
+                                <p :class="verificationResult.success ? 'text-green-600' : 'text-red-600'" class="text-lg" 
+                                   x-text="verificationResult.message"></p>
+                            </div>
+
+                            <!-- Detailed Results -->
+                            <div class="bg-gray-50 rounded-lg p-6 mb-6">
+                                <h4 class="font-semibold text-gray-800 mb-4">🔍 Detalles de la Verificación:</h4>
+                                
+                                <!-- OCR Results -->
+                                <div class="mb-6 p-4 bg-white rounded-lg border">
+                                    <h5 class="font-medium text-gray-800 mb-3">📄 Datos Extraídos del DNI (OCR):</h5>
+                                    <div class="bg-gray-100 rounded-lg p-3 mb-3">
+                                        <pre x-text="extractedText || 'Sin datos extraídos'" class="text-sm text-gray-700 whitespace-pre-wrap max-h-32 overflow-y-auto"></pre>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <span class="text-gray-600 mr-2">Estado OCR:</span>
+                                        <span :class="verificationResult.dataExtracted ? 'text-green-600' : 'text-red-600'" class="font-medium">
+                                            <i :class="verificationResult.dataExtracted ? 'fas fa-check' : 'fas fa-times'" class="mr-1"></i>
+                                            <span x-text="verificationResult.dataExtracted ? 'Texto extraído correctamente' : 'Error en extracción de texto'"></span>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Data Comparison Section -->
+                                <div x-show="verificationResult.dataComparison" class="mb-6 p-4 bg-white rounded-lg border">
+                                    <h5 class="font-medium text-gray-800 mb-4">📊 Comparación de Datos: Insertados vs Extraídos</h5>
+                                    
+                                    <div class="space-y-3">
+                                        <!-- Name comparison -->
+                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 border rounded-lg">
+                                            <div>
+                                                <span class="text-sm font-medium text-gray-600">Nombre:</span>
+                                            </div>
+                                            <div>
+                                                <span class="text-sm text-blue-700">Insertado:</span>
+                                                <p class="font-medium" x-text="verificationResult.dataComparison.name.input"></p>
+                                            </div>
+                                            <div>
+                                                <span class="text-sm text-purple-700">Extraído:</span>
+                                                <p class="font-medium" x-text="verificationResult.dataComparison.name.extracted"></p>
+                                                <span :class="verificationResult.dataComparison.name.match ? 'text-green-600' : 'text-red-600'" class="text-sm">
+                                                    <i :class="verificationResult.dataComparison.name.match ? 'fas fa-check' : 'fas fa-times'" class="mr-1"></i>
+                                                    <span x-text="verificationResult.dataComparison.name.match ? 'Coincide' : 'No coincide'"></span>
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <!-- DNI comparison -->
+                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 border rounded-lg">
+                                            <div>
+                                                <span class="text-sm font-medium text-gray-600">DNI:</span>
+                                            </div>
+                                            <div>
+                                                <span class="text-sm text-blue-700">Insertado:</span>
+                                                <p class="font-medium" x-text="verificationResult.dataComparison.dni.input"></p>
+                                            </div>
+                                            <div>
+                                                <span class="text-sm text-purple-700">Extraído:</span>
+                                                <p class="font-medium" x-text="verificationResult.dataComparison.dni.extracted"></p>
+                                                <span :class="verificationResult.dataComparison.dni.match ? 'text-green-600' : 'text-red-600'" class="text-sm">
+                                                    <i :class="verificationResult.dataComparison.dni.match ? 'fas fa-check' : 'fas fa-times'" class="mr-1"></i>
+                                                    <span x-text="verificationResult.dataComparison.dni.match ? 'Coincide' : 'No coincide'"></span>
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <!-- Birth Date comparison -->
+                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 border rounded-lg">
+                                            <div>
+                                                <span class="text-sm font-medium text-gray-600">Fecha Nacimiento:</span>
+                                            </div>
+                                            <div>
+                                                <span class="text-sm text-blue-700">Insertado:</span>
+                                                <p class="font-medium" x-text="verificationResult.dataComparison.birthDate.input"></p>
+                                            </div>
+                                            <div>
+                                                <span class="text-sm text-purple-700">Extraído:</span>
+                                                <p class="font-medium" x-text="verificationResult.dataComparison.birthDate.extracted"></p>
+                                                <span :class="verificationResult.dataComparison.birthDate.match ? 'text-green-600' : 'text-red-600'" class="text-sm">
+                                                    <i :class="verificationResult.dataComparison.birthDate.match ? 'fas fa-check' : 'fas fa-times'" class="mr-1"></i>
+                                                    <span x-text="verificationResult.dataComparison.birthDate.match ? 'Coincide' : 'No coincide'"></span>
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <!-- Address comparison -->
+                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 border rounded-lg">
+                                            <div>
+                                                <span class="text-sm font-medium text-gray-600">Domicilio:</span>
+                                            </div>
+                                            <div>
+                                                <span class="text-sm text-blue-700">Insertado:</span>
+                                                <p class="font-medium text-xs" x-text="verificationResult.dataComparison.address.input"></p>
+                                            </div>
+                                            <div>
+                                                <span class="text-sm text-purple-700">Extraído:</span>
+                                                <p class="font-medium text-xs" x-text="verificationResult.dataComparison.address.extracted"></p>
+                                                <span :class="verificationResult.dataComparison.address.match ? 'text-green-600' : 'text-red-600'" class="text-sm">
+                                                    <i :class="verificationResult.dataComparison.address.match ? 'fas fa-check' : 'fas fa-times'" class="mr-1"></i>
+                                                    <span x-text="verificationResult.dataComparison.address.match ? 'Coincide' : 'No coincide'"></span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Summary of data matching -->
+                                    <div class="mt-4 p-3 rounded-lg" :class="verificationResult.dataComparison.overallMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'">
+                                        <div class="flex items-center">
+                                            <i :class="verificationResult.dataComparison.overallMatch ? 'fas fa-check-circle text-green-600' : 'fas fa-times-circle text-red-600'" class="mr-2"></i>
+                                            <span class="font-medium" :class="verificationResult.dataComparison.overallMatch ? 'text-green-800' : 'text-red-800'">
+                                                Coincidencias de datos: <span x-text="verificationResult.dataComparison.matchCount"></span> de <span x-text="verificationResult.dataComparison.totalFields"></span>
+                                            </span>
+                                        </div>
+                                        <p class="text-sm mt-1" :class="verificationResult.dataComparison.overallMatch ? 'text-green-700' : 'text-red-700'" x-text="verificationResult.dataComparison.summary"></p>
+                                    </div>
+                                </div>
+
+                                <!-- Face Comparison Results -->
+                                <div class="space-y-4">
+                                    <div class="p-4 bg-white rounded-lg border">
+                                        <div class="flex justify-between items-start">
+                                            <div>
+                                                <h5 class="font-medium text-gray-800">👤 DNI vs Selfie:</h5>
+                                                <p class="text-sm text-gray-600">Comparación facial entre documento y selfie</p>
+                                            </div>
+                                            <span :class="verificationResult.dniMatch ? 'text-green-600' : 'text-red-600'" class="font-medium">
+                                                <i :class="verificationResult.dniMatch ? 'fas fa-check-circle' : 'fas fa-times-circle'" class="mr-1"></i>
+                                                <span x-text="verificationResult.dniMatch ? 'COINCIDE' : 'NO COINCIDE'"></span>
+                                            </span>
+                                        </div>
+                                        <div x-show="!verificationResult.dniMatch" class="mt-2 text-sm text-red-600">
+                                            ⚠️ La cara del DNI no coincide con el selfie tomado
+                                        </div>
+                                    </div>
+
+                                    <div class="p-4 bg-white rounded-lg border">
+                                        <div class="flex justify-between items-start">
+                                            <div>
+                                                <h5 class="font-medium text-gray-800">🎬 Selfie vs Video:</h5>
+                                                <p class="text-sm text-gray-600">Verificación de vida - detección en video</p>
+                                            </div>
+                                            <span :class="verificationResult.videoMatch ? 'text-green-600' : 'text-red-600'" class="font-medium">
+                                                <i :class="verificationResult.videoMatch ? 'fas fa-check-circle' : 'fas fa-times-circle'" class="mr-1"></i>
+                                                <span x-text="verificationResult.videoMatch ? 'DETECTADO' : 'NO DETECTADO'"></span>
+                                            </span>
+                                        </div>
+                                        <div x-show="!verificationResult.videoMatch" class="mt-2 text-sm text-red-600">
+                                            ⚠️ No se detectó la persona del selfie en el video de verificación
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Debug Information -->
+                                <div x-show="verificationResult.debugInfo" class="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                    <h5 class="font-medium text-yellow-800 mb-2">🐛 Información de Debugging:</h5>
+                                    <ul class="text-sm text-yellow-700 space-y-1">
+                                        <li x-show="verificationResult.debugInfo?.ocrLength">
+                                            • Caracteres extraídos: <span x-text="verificationResult.debugInfo?.ocrLength"></span>
+                                        </li>
+                                        <li x-show="verificationResult.debugInfo?.filesUploaded">
+                                            • Archivos subidos: <span x-text="verificationResult.debugInfo?.filesUploaded"></span>
+                                        </li>
+                                        <li x-show="verificationResult.debugInfo?.apiErrors">
+                                            • Errores de API: <span x-text="verificationResult.debugInfo?.apiErrors"></span>
+                                        </li>
+                                        <li x-show="verificationResult.debugInfo?.processingTime">
+                                            • Tiempo de procesamiento: <span x-text="verificationResult.debugInfo?.processingTime"></span>ms
+                                        </li>
+                                    </ul>
+                                </div>
+
+                                <!-- Summary -->
+                                <div class="mt-4 p-3 rounded-lg" :class="verificationResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
+                                    <div class="flex items-center">
+                                        <i :class="verificationResult.success ? 'fas fa-shield-check' : 'fas fa-shield-times'" class="mr-2"></i>
+                                        <strong x-text="verificationResult.success ? 'VERIFICACIÓN EXITOSA' : 'VERIFICACIÓN FALLIDA'"></strong>
+                                    </div>
+                                    <p class="text-sm mt-1" x-text="verificationResult.message"></p>
+                                </div>
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="text-center space-x-4">
+                                <button @click="restartVerification()" class="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition-colors">
+                                    <i class="fas fa-redo mr-2"></i>Reiniciar Proceso
+                                </button>
+                                <button x-show="verificationResult.success" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors">
+                                    <i class="fas fa-download mr-2"></i>Descargar Certificado
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div x-show="!verifying" class="flex justify-between mt-8">
+                        <button @click="previousStep()" class="px-6 py-3 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                            <i class="fas fa-arrow-left mr-2"></i>Anterior
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Messages -->
+        <div x-show="errorMessage" 
+             class="fixed top-4 right-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-lg z-50 max-w-md">
+            <div class="flex items-center">
+                <i class="fas fa-exclamation-circle mr-2"></i>
+                <span x-text="errorMessage"></span>
+                <button @click="errorMessage = ''" class="ml-4 text-xl">&times;</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function kycVerification() {
+            return {
+                currentStep: 1,
+                processing: false,
+                errorMessage: '',
+                
+                // Step 1 Data
+                userData: {
+                    firstName: '',
+                    lastName: '',
+                    dni: '',
+                    sex: '',
+                    birthDate: '',
+                    nationality: 'ESP',
+                    address: ''
+                },
+                dniPhotoFile: null,
+                dniPhotoPreview: null,
+                dniPhotoPath: null,
+                extractedText: '',
+                
+                // Step 2 Data
+                cameraActive: false,
+                selfiePhoto: null,
+                
+                // Step 3 Data
+                videoActive: false,
+                recording: false,
+                recordingTime: '00:00',
+                recordedVideo: null,
+                mediaRecorder: null,
+                recordingTimer: null,
+                
+                // Liveness Detection Data
+                currentInstruction: null,
+                instructionProgress: 0,
+                instructionTimer: null,
+                livenessInstructions: [
+                    { 
+                        icon: '👀', 
+                        title: 'Mire a la cámara', 
+                        description: 'Mantenga su rostro centrado',
+                        duration: 2000
+                    },
+                    { 
+                        icon: '🔄', 
+                        title: 'Gire la cabeza despacio', 
+                        description: 'Movimiento circular lento',
+                        duration: 4000
+                    },
+                    { 
+                        icon: '↕️', 
+                        title: 'Mueva la cabeza arriba y abajo', 
+                        description: 'Sí con la cabeza - despacio',
+                        duration: 3000
+                    },
+                    { 
+                        icon: '↔️', 
+                        title: 'Mueva la cabeza izquierda y derecha', 
+                        description: 'No con la cabeza - despacio',
+                        duration: 3000
+                    },
+                    { 
+                        icon: '😊', 
+                        title: 'Sonría', 
+                        description: 'Sonrisa natural y manténgala',
+                        duration: 2000
+                    },
+                    { 
+                        icon: '👁️', 
+                        title: 'Parpadee 3 veces', 
+                        description: 'Parpadeos lentos y claros',
+                        duration: 3000
+                    }
+                ],
+                currentInstructionIndex: 0,
+                
+                // Step 4 Data
+                verifying: false,
+                verificationComplete: false,
+                verificationProgress: 0,
+                verificationStep: '',
+                verificationResult: {
+                    success: false,
+                    message: '',
+                    dniMatch: false,
+                    videoMatch: false,
+                    dataExtracted: false,
+                    dataComparison: null
+                },
+
+                init() {
+                    console.log('KYC Verification initialized');
+                },
+
+                getStepClass(step) {
+                    if (step < this.currentStep) return 'step-completed';
+                    if (step === this.currentStep) return 'step-active';
+                    return 'step-inactive';
+                },
+
+                nextStep() {
+                    if (this.currentStep === 3) {
+                        this.startVerification();
+                    }
+                    this.currentStep++;
+                },
+
+                previousStep() {
+                    if (this.currentStep > 1) {
+                        this.currentStep--;
+                    }
+                },
+
+                // Step 1 Functions
+                handleDNIPhoto(event) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        this.dniPhotoFile = file;
+                        const reader = new FileReader();
+                        reader.onload = (e) => this.dniPhotoPreview = e.target.result;
+                        reader.readAsDataURL(file);
+                    }
+                },
+
+                async extractDNIText() {
+                    if (!this.dniPhotoFile) return;
+                    
+                    this.processing = true;
+                    try {
+                        // 1. Upload image to server
+                        const formData = new FormData();
+                        formData.append('image', this.dniPhotoFile);
+                        
+                        const uploadResponse = await fetch('/upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        if (!uploadResponse.ok) {
+                            throw new Error('Error al subir la imagen');
+                        }
+                        
+                        const uploadData = await uploadResponse.json();
+                        this.dniPhotoPath = uploadData.path; // Save DNI path for later comparison
+                        
+                        // 2. Extract text using real OCR API
+                        const ocrResponse = await fetch(`/textImage?known=${encodeURIComponent(uploadData.path)}`);
+                        
+                        if (!ocrResponse.ok) {
+                            throw new Error('Error en el procesamiento OCR');
+                        }
+                        
+                        this.extractedText = await ocrResponse.text();
+                        
+                        if (!this.extractedText.trim()) {
+                            this.extractedText = 'No se pudo extraer texto de la imagen. Verifique que la imagen sea clara y contenga texto legible.';
+                        }
+                        
+                    } catch (error) {
+                        this.showError('Error al procesar la imagen del DNI: ' + error.message);
+                        console.error('OCR Error:', error);
+                    } finally {
+                        this.processing = false;
+                    }
+                },
+
+                canProceedStep1() {
+                    return this.userData.firstName && 
+                           this.userData.lastName &&
+                           this.userData.dni && 
+                           this.userData.sex &&
+                           this.userData.birthDate && 
+                           this.userData.address &&
+                           this.dniPhotoFile;
+                },
+
+                // Step 2 Functions
+                async startSelfieCamera() {
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ 
+                            video: { width: 640, height: 480 } 
+                        });
+                        this.$refs.selfieVideo.srcObject = stream;
+                        this.cameraActive = true;
+                    } catch (error) {
+                        this.showError('No se pudo acceder a la cámara');
+                    }
+                },
+
+                takeSelfie() {
+                    const video = this.$refs.selfieVideo;
+                    const canvas = this.$refs.selfieCanvas;
+                    const context = canvas.getContext('2d');
+                    
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    
+                    context.scale(-1, 1);
+                    context.drawImage(video, -canvas.width, 0);
+                    
+                    this.selfiePhoto = canvas.toDataURL('image/jpeg');
+                    this.stopCamera(video);
+                },
+
+                retakeSelfie() {
+                    this.selfiePhoto = null;
+                    this.startSelfieCamera();
+                },
+
+                // Step 3 Functions
+                async startVideoCamera() {
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ 
+                            video: { width: 640, height: 480 },
+                            audio: true
+                        });
+                        this.$refs.recordVideo.srcObject = stream;
+                        this.videoActive = true;
+                    } catch (error) {
+                        this.showError('No se pudo acceder a la cámara');
+                    }
+                },
+
+                startLivenessRecording() {
+                    const stream = this.$refs.recordVideo.srcObject;
+                    this.mediaRecorder = new MediaRecorder(stream);
+                    const chunks = [];
+                    
+                    this.mediaRecorder.ondataavailable = (event) => {
+                        chunks.push(event.data);
+                    };
+                    
+                    this.mediaRecorder.onstop = () => {
+                        const blob = new Blob(chunks, { type: 'video/webm' });
+                        this.recordedVideo = URL.createObjectURL(blob);
+                    };
+                    
+                    this.mediaRecorder.start();
+                    this.recording = true;
+                    this.currentInstructionIndex = 0;
+                    this.startRecordingTimer();
+                    this.startLivenessSequence();
+                },
+
+                startLivenessSequence() {
+                    // Wait 1 second before starting instructions
+                    setTimeout(() => {
+                        this.showNextInstruction();
+                    }, 1000);
+                },
+
+                showNextInstruction() {
+                    if (this.currentInstructionIndex >= this.livenessInstructions.length) {
+                        this.stopLivenessRecording();
+                        return;
+                    }
+
+                    const instruction = this.livenessInstructions[this.currentInstructionIndex];
+                    this.currentInstruction = instruction;
+                    this.instructionProgress = 0;
+
+                    // Animate progress bar
+                    const progressStep = 100 / (instruction.duration / 100);
+                    this.instructionTimer = setInterval(() => {
+                        this.instructionProgress += progressStep;
+                        if (this.instructionProgress >= 100) {
+                            clearInterval(this.instructionTimer);
+                            this.currentInstructionIndex++;
+                            setTimeout(() => {
+                                this.showNextInstruction();
+                            }, 500);
+                        }
+                    }, 100);
+                },
+
+                stopLivenessRecording() {
+                    this.currentInstruction = null;
+                    if (this.instructionTimer) {
+                        clearInterval(this.instructionTimer);
+                    }
+                    
+                    if (this.mediaRecorder && this.recording) {
+                        this.mediaRecorder.stop();
+                        this.recording = false;
+                        this.stopRecordingTimer();
+                        this.stopCamera(this.$refs.recordVideo);
+                    }
+                },
+
+                retakeVideo() {
+                    this.recordedVideo = null;
+                    this.currentInstruction = null;
+                    this.currentInstructionIndex = 0;
+                    if (this.instructionTimer) {
+                        clearInterval(this.instructionTimer);
+                    }
+                    this.startVideoCamera();
+                },
+
+                startRecordingTimer() {
+                    let seconds = 0;
+                    this.recordingTimer = setInterval(() => {
+                        seconds++;
+                        const mins = Math.floor(seconds / 60);
+                        const secs = seconds % 60;
+                        this.recordingTime = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                    }, 1000);
+                },
+
+                stopRecordingTimer() {
+                    if (this.recordingTimer) {
+                        clearInterval(this.recordingTimer);
+                        this.recordingTimer = null;
+                    }
+                },
+
+                stopCamera(videoElement) {
+                    const stream = videoElement.srcObject;
+                    if (stream) {
+                        const tracks = stream.getTracks();
+                        tracks.forEach(track => track.stop());
+                        videoElement.srcObject = null;
+                    }
+                    this.cameraActive = false;
+                    this.videoActive = false;
+                },
+
+                // Step 4 Functions
+                async startVerification() {
+                    this.verifying = true;
+                    this.verificationProgress = 0;
+                    this.verificationStep = 'Iniciando verificación...';
+                    const verificationStartTime = Date.now();
+                    
+                    try {
+                        // Step 1: Upload selfie and video files
+                        this.verificationProgress = 20;
+                        this.verificationStep = 'Subiendo archivos...';
+                        
+                        const selfieFile = this.dataURLtoFile(this.selfiePhoto, 'selfie.jpg');
+                        
+                        // Handle video file (blob URL requires async conversion)
+                        let videoFile;
+                        if (this.recordedVideo.startsWith('blob:')) {
+                            const videoBlob = await fetch(this.recordedVideo).then(res => res.blob());
+                            videoFile = new File([videoBlob], 'verification_video.mp4', { type: 'video/mp4' });
+                        } else {
+                            videoFile = this.dataURLtoFile(this.recordedVideo, 'verification_video.mp4');
+                        }
+                        
+                        // Upload selfie
+                        const selfieFormData = new FormData();
+                        selfieFormData.append('image', selfieFile);
+                        const selfieUpload = await fetch('/upload', {
+                            method: 'POST',
+                            body: selfieFormData
+                        });
+                        
+                        if (!selfieUpload.ok) {
+                            throw new Error('Error al subir el selfie');
+                        }
+                        const selfieData = await selfieUpload.json();
+                        
+                        // Upload video
+                        const videoFormData = new FormData();
+                        videoFormData.append('video', videoFile); // Using 'video' field as per server.py
+                        const videoUpload = await fetch('/upload', {
+                            method: 'POST',
+                            body: videoFormData
+                        });
+                        
+                        if (!videoUpload.ok) {
+                            throw new Error('Error al subir el video');
+                        }
+                        const videoData = await videoUpload.json();
+                        
+                        // Step 2: Compare DNI with selfie
+                        this.verificationProgress = 50;
+                        this.verificationStep = 'Comparando DNI con selfie...';
+                        
+                        const dniSelfieResponse = await fetch(`/faceImage?known=${encodeURIComponent(this.dniPhotoPath)}&unknown=${encodeURIComponent(selfieData.path)}`);
+                        const dniMatch = (await dniSelfieResponse.text()) === 'True';
+                        
+                        // Step 3: Compare selfie with video
+                        this.verificationProgress = 80;
+                        this.verificationStep = 'Comparando selfie con video...';
+                        
+                        const selfieVideoResponse = await fetch(`/faceVideo?known=${encodeURIComponent(selfieData.path)}&unknown=${encodeURIComponent(videoData.path)}`);
+                        const videoMatch = (await selfieVideoResponse.text()) === 'True';
+                        
+                        // Step 4: Final result
+                        this.verificationProgress = 100;
+                        this.verificationStep = 'Finalizando verificación...';
+                        
+                        const dataExtracted = this.extractedText && this.extractedText.trim().length > 0;
+                        
+                        // Create data comparison
+                        const dataComparison = this.createDataComparison();
+                        
+                        const success = dniMatch && videoMatch && dataExtracted;
+                        
+                        // Create detailed error message
+                        let errorMessage = '';
+                        if (!success) {
+                            const errors = [];
+                            if (!dniMatch) errors.push('DNI y selfie no coinciden');
+                            if (!videoMatch) errors.push('Selfie no detectado en video');
+                            if (!dataExtracted) errors.push('No se extrajeron datos del DNI');
+                            errorMessage = `Fallos encontrados: ${errors.join(', ')}`;
+                        }
+                        
+                        this.verificationResult = {
+                            success,
+                            message: success ? 
+                                'Su identidad ha sido verificada exitosamente' : 
+                                errorMessage,
+                            dniMatch,
+                            videoMatch,
+                            dataExtracted,
+                            dataComparison,
+                            debugInfo: {
+                                ocrLength: this.extractedText?.length || 0,
+                                filesUploaded: `DNI: ${this.dniPhotoPath ? '✓' : '✗'}, Selfie: ${selfieData.path ? '✓' : '✗'}, Video: ${videoData.path ? '✓' : '✗'}`,
+                                apiErrors: success ? 'Ninguno' : 'Ver detalles arriba',
+                                processingTime: Date.now() - verificationStartTime
+                            }
+                        };
+                        
+                    } catch (error) {
+                        // Create data comparison even in error case
+                        const dataComparison = this.createDataComparison();
+                        
+                        this.verificationResult = {
+                            success: false,
+                            message: 'Error durante la verificación: ' + error.message,
+                            dniMatch: false,
+                            videoMatch: false,
+                            dataExtracted: false,
+                            dataComparison,
+                            debugInfo: {
+                                ocrLength: this.extractedText?.length || 0,
+                                filesUploaded: `Error en subida de archivos`,
+                                apiErrors: error.message,
+                                processingTime: Date.now() - verificationStartTime
+                            }
+                        };
+                        console.error('Verification Error:', error);
+                    } finally {
+                        this.verifying = false;
+                        this.verificationComplete = true;
+                    }
+                },
+
+                restartVerification() {
+                    this.currentStep = 1;
+                    this.verifying = false;
+                    this.verificationComplete = false;
+                    this.verificationProgress = 0;
+                    
+                    // Reset all data
+                    this.userData = { 
+                        firstName: '', 
+                        lastName: '', 
+                        dni: '', 
+                        sex: '',
+                        birthDate: '', 
+                        nationality: 'ESP',
+                        address: '' 
+                    };
+                    this.dniPhotoFile = null;
+                    this.dniPhotoPreview = null;
+                    this.dniPhotoPath = null;
+                    this.extractedText = '';
+                    this.selfiePhoto = null;
+                    this.recordedVideo = null;
+                    
+                    // Reset liveness detection
+                    this.currentInstruction = null;
+                    this.currentInstructionIndex = 0;
+                    this.instructionProgress = 0;
+                    if (this.instructionTimer) {
+                        clearInterval(this.instructionTimer);
+                    }
+                },
+
+                createDataComparison() {
+                    if (!this.extractedText) {
+                        return {
+                            name: { input: 'N/A', extracted: 'Sin datos', match: false },
+                            dni: { input: 'N/A', extracted: 'Sin datos', match: false },
+                            birthDate: { input: 'N/A', extracted: 'Sin datos', match: false },
+                            address: { input: 'N/A', extracted: 'Sin datos', match: false },
+                            matchCount: 0,
+                            totalFields: 4,
+                            overallMatch: false,
+                            summary: 'No se pudieron extraer datos del DNI para comparar'
+                        };
+                    }
+
+                    const extractedText = this.extractedText.toUpperCase();
+                    
+                    // Extract data from OCR text
+                    const extractedData = {
+                        name: this.extractNameFromOCR(extractedText),
+                        dni: this.extractDNIFromOCR(extractedText),
+                        birthDate: this.extractBirthDateFromOCR(extractedText),
+                        address: this.extractAddressFromOCR(extractedText)
+                    };
+
+                    // User input data (formatted for comparison)
+                    const inputData = {
+                        name: `${this.userData.lastName}, ${this.userData.firstName}`.toUpperCase(),
+                        dni: this.userData.dni.toUpperCase(),
+                        birthDate: this.formatBirthDate(this.userData.birthDate),
+                        address: this.userData.address.toUpperCase()
+                    };
+
+                    // Compare each field
+                    const comparison = {
+                        name: {
+                            input: inputData.name,
+                            extracted: extractedData.name,
+                            match: this.compareNames(inputData.name, extractedData.name)
+                        },
+                        dni: {
+                            input: inputData.dni,
+                            extracted: extractedData.dni,
+                            match: this.compareDNI(inputData.dni, extractedData.dni)
+                        },
+                        birthDate: {
+                            input: inputData.birthDate,
+                            extracted: extractedData.birthDate,
+                            match: this.compareBirthDate(inputData.birthDate, extractedData.birthDate)
+                        },
+                        address: {
+                            input: inputData.address,
+                            extracted: extractedData.address,
+                            match: this.compareAddress(inputData.address, extractedData.address)
+                        }
+                    };
+
+                    // Calculate overall match
+                    const matches = Object.values(comparison).filter(field => field.match);
+                    const matchCount = matches.length;
+                    const totalFields = 4;
+                    const overallMatch = matchCount >= 3; // At least 3 out of 4 fields must match
+
+                    return {
+                        ...comparison,
+                        matchCount,
+                        totalFields,
+                        overallMatch,
+                        summary: overallMatch ? 
+                            `Excelente: ${matchCount} de ${totalFields} campos coinciden` :
+                            `Problema: Solo ${matchCount} de ${totalFields} campos coinciden`
+                    };
+                },
+
+                extractNameFromOCR(text) {
+                    // Look for name patterns in Spanish DNI
+                    const lines = text.split(/\n|\r/);
+                    let apellidos = '';
+                    let nombre = '';
+                    
+                    // Find apellidos (usually before NOMBRE/NOM line)
+                    for (let i = 0; i < lines.length; i++) {
+                        const line = lines[i].trim();
+                        
+                        // Skip empty lines and lines with numbers/symbols
+                        if (!line || /\d/.test(line) || /[~®©]/.test(line) || line.length < 3) continue;
+                        
+                        // Check if next line contains NOMBRE
+                        const nextLine = lines[i + 1] ? lines[i + 1].trim() : '';
+                        if (nextLine.includes('NOMBRE') || nextLine.includes('NOM')) {
+                            apellidos = line;
+                            break;
+                        }
+                        
+                        // Also check if this looks like a surname (all caps, no special chars)
+                        if (/^[A-ZÁÉÍÓÚÑ\s]+$/.test(line) && line.length > 2 && line.length < 30) {
+                            // Check if it's not a common DNI word
+                            if (!line.includes('REINO') && !line.includes('ESPANA') && !line.includes('SEXO') && 
+                                !line.includes('NACIONALIDAD') && !line.includes('IDENTITY')) {
+                                apellidos = line;
+                            }
+                        }
+                    }
+                    
+                    // Find nombre (usually after NOMBRE/NOM line)
+                    for (let i = 0; i < lines.length; i++) {
+                        const line = lines[i].trim();
+                        if (line.includes('NOMBRE') || line.includes('NOM')) {
+                            // Check next line for the actual name
+                            const nextLine = lines[i + 1] ? lines[i + 1].trim() : '';
+                            if (nextLine && /^[A-ZÁÉÍÓÚÑ\s]+$/.test(nextLine) && nextLine.length > 1 && nextLine.length < 20) {
+                                nombre = nextLine;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (apellidos && nombre) {
+                        return `${apellidos}, ${nombre}`;
+                    } else if (apellidos) {
+                        return apellidos;
+                    } else if (nombre) {
+                        return nombre;
+                    }
+                    
+                    return 'No encontrado en DNI';
+                },
+
+                extractDNIFromOCR(text) {
+                    // Look for DNI number patterns in Spanish DNI
+                    const dniPatterns = [
+                        /(\d{8}[A-Z])/g,  // 12345678X (most common)
+                        /(\d{8}\s*[A-Z])/g,  // 12345678 X (with space)
+                        /[^\d]*(\d{8})[^\d\s]*([A-Z])/g,  // ~12345678GE® (with junk around)
+                        /DNI[:\s]*(\d{8}[A-Z])/g,
+                        /(\d{8}-[A-Z])/g  // 12345678-X
+                    ];
+                    
+                    for (const pattern of dniPatterns) {
+                        let match;
+                        while ((match = pattern.exec(text)) !== null) {
+                            if (match[1] && match[2]) {
+                                // Pattern with separated numbers and letter
+                                const dni = match[1] + match[2];
+                                if (dni.length === 9) return dni;
+                            } else if (match[1]) {
+                                // Pattern with combined number and letter
+                                const dni = match[1].replace(/[-\s]/g, '');
+                                if (dni.length === 9 && /^\d{8}[A-Z]$/.test(dni)) {
+                                    return dni;
+                                }
+                            }
+                        }
+                        pattern.lastIndex = 0; // Reset regex
+                    }
+                    
+                    // Try to find 8 digits followed by a letter anywhere in text
+                    const fallbackMatch = text.match(/(\d{8})[^\d]*([A-Z])/);
+                    if (fallbackMatch) {
+                        return fallbackMatch[1] + fallbackMatch[2];
+                    }
+                    
+                    return 'No encontrado en DNI';
+                },
+
+                extractBirthDateFromOCR(text) {
+                    // Look for birth date patterns in Spanish DNI
+                    const datePatterns = [
+                        /NACIMIENTO[:\s\/]*(\d{2}[\s\/\-]\d{2}[\s\/\-]\d{4})/i,  // NACIMIENTO 06 03 1994
+                        /NAIXEMENT[:\s\/]*(\d{2}[\s\/\-]\d{2}[\s\/\-]\d{4})/i,   // Catalan version
+                        /(\d{2}\s+\d{2}\s+\d{4})/g,  // 06 03 1994 (spaces)
+                        /(\d{2}[\/\-]\d{2}[\/\-]\d{4})/g,  // 06/03/1994 or 06-03-1994
+                        /(\d{1,2}\s+\d{1,2}\s+\d{4})/g  // 6 3 1994 (single digits)
+                    ];
+                    
+                    for (const pattern of datePatterns) {
+                        let match;
+                        if (pattern.global) {
+                            while ((match = pattern.exec(text)) !== null) {
+                                let dateStr = match[1];
+                                // Normalize date format
+                                dateStr = dateStr.replace(/\s+/g, '/').replace(/-/g, '/');
+                                
+                                // Validate it looks like a reasonable birth date
+                                const parts = dateStr.split('/');
+                                if (parts.length === 3) {
+                                    const day = parseInt(parts[0]);
+                                    const month = parseInt(parts[1]);
+                                    const year = parseInt(parts[2]);
+                                    
+                                    // Basic validation: reasonable birth year and valid day/month ranges
+                                    if (year >= 1920 && year <= 2010 && 
+                                        day >= 1 && day <= 31 && 
+                                        month >= 1 && month <= 12) {
+                                        return dateStr;
+                                    }
+                                }
+                            }
+                            pattern.lastIndex = 0; // Reset regex
+                        } else {
+                            match = text.match(pattern);
+                            if (match) {
+                                let dateStr = match[1];
+                                dateStr = dateStr.replace(/\s+/g, '/').replace(/-/g, '/');
+                                return dateStr;
+                            }
+                        }
+                    }
+                    
+                    return 'No encontrado en DNI';
+                },
+
+                extractAddressFromOCR(text) {
+                    // Look for address patterns in Spanish DNI
+                    const addressPatterns = [
+                        /DOMICILIO[:\s]*([A-ZÁÉÍÓÚÑ0-9\s,.-]+?)(?=\n|\r|FECHA|EXPEDICIÓN|VALIDEZ|$)/i,
+                        /DIRECCIÓN[:\s]*([A-ZÁÉÍÓÚÑ0-9\s,.-]+?)(?=\n|\r|FECHA|EXPEDICIÓN|VALIDEZ|$)/i,
+                        /DIRECCIÓ[:\s]*([A-ZÁÉÍÓÚÑ0-9\s,.-]+?)(?=\n|\r|FECHA|EXPEDICIÓ|VALIDESA|$)/i,  // Catalan
+                        /CALLE[:\s]*([A-ZÁÉÍÓÚÑ0-9\s,.-]+?)(?=\n|\r|FECHA|EXPEDICIÓN|VALIDEZ|$)/i,
+                        /CARRER[:\s]*([A-ZÁÉÍÓÚÑ0-9\s,.-]+?)(?=\n|\r|FECHA|EXPEDICIÓ|VALIDESA|$)/i,  // Catalan
+                        /AVENIDA[:\s]*([A-ZÁÉÍÓÚÑ0-9\s,.-]+?)(?=\n|\r|FECHA|EXPEDICIÓN|VALIDEZ|$)/i,
+                        /PLAZA[:\s]*([A-ZÁÉÍÓÚÑ0-9\s,.-]+?)(?=\n|\r|FECHA|EXPEDICIÓN|VALIDEZ|$)/i
+                    ];
+                    
+                    for (const pattern of addressPatterns) {
+                        const match = text.match(pattern);
+                        if (match && match[1]) {
+                            const address = match[1].trim();
+                            // Filter out very short or obviously wrong matches
+                            if (address.length > 5 && !address.includes('FECHA') && !address.includes('EXPEDICIÓN')) {
+                                return address;
+                            }
+                        }
+                    }
+                    
+                    // Some DNI don't show full address, look for patterns like street names
+                    const lines = text.split(/\n|\r/);
+                    for (const line of lines) {
+                        const trimmed = line.trim();
+                        // Look for lines that might be addresses (contain numbers and letters, reasonable length)
+                        if (/^[A-ZÁÉÍÓÚÑ\s]+\s+\d+/.test(trimmed) && trimmed.length > 10 && trimmed.length < 60) {
+                            // Make sure it's not a date or DNI number
+                            if (!/\d{8}/.test(trimmed) && !/\d{2}\s+\d{2}\s+\d{4}/.test(trimmed)) {
+                                return trimmed;
+                            }
+                        }
+                    }
+                    
+                    return 'No encontrado en DNI';
+                },
+
+                formatBirthDate(dateString) {
+                    if (!dateString) return 'No proporcionado';
+                    
+                    try {
+                        const date = new Date(dateString);
+                        const day = date.getDate().toString().padStart(2, '0');
+                        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                        const year = date.getFullYear();
+                        return `${day}/${month}/${year}`;
+                    } catch {
+                        return dateString;
+                    }
+                },
+
+                compareNames(input, extracted) {
+                    if (!input || !extracted || extracted === 'No encontrado en DNI') return false;
+                    
+                    // Remove special characters and extra spaces
+                    const cleanInput = input.replace(/[^A-ZÁÉÍÓÚÑ\s]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+                    const cleanExtracted = extracted.replace(/[^A-ZÁÉÍÓÚÑ\s]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+                    
+                    // Split names into parts
+                    const inputParts = cleanInput.split(/[,\s]+/).filter(part => part.length > 1);
+                    const extractedParts = cleanExtracted.split(/[,\s]+/).filter(part => part.length > 1);
+                    
+                    // Check if there's significant overlap between name parts
+                    let matches = 0;
+                    for (const inputPart of inputParts) {
+                        for (const extractedPart of extractedParts) {
+                            if (inputPart === extractedPart || 
+                                inputPart.includes(extractedPart) || 
+                                extractedPart.includes(inputPart) ||
+                                this.calculateSimilarity(inputPart, extractedPart) > 0.85) {
+                                matches++;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Consider it a match if at least 50% of the input parts have a match
+                    const matchRatio = matches / Math.max(inputParts.length, 1);
+                    
+                    // Also check direct similarity as fallback
+                    const directSimilarity = this.calculateSimilarity(cleanInput, cleanExtracted);
+                    
+                    return matchRatio >= 0.5 || directSimilarity > 0.7;
+                },
+
+                compareDNI(input, extracted) {
+                    if (!input || !extracted || extracted === 'No encontrado en DNI') return false;
+                    
+                    const cleanInput = input.replace(/[^0-9A-Z]/g, '').toUpperCase();
+                    const cleanExtracted = extracted.replace(/[^0-9A-Z]/g, '').toUpperCase();
+                    
+                    // Exact match is preferred
+                    if (cleanInput === cleanExtracted) return true;
+                    
+                    // If both are 9 characters (8 digits + letter), check similarity
+                    if (cleanInput.length === 9 && cleanExtracted.length === 9) {
+                        // Check if the letter matches (most important part)
+                        const inputLetter = cleanInput.slice(-1);
+                        const extractedLetter = cleanExtracted.slice(-1);
+                        
+                        // Check if the numbers are similar (allow 1-2 character differences for OCR errors)
+                        const inputNumbers = cleanInput.slice(0, 8);
+                        const extractedNumbers = cleanExtracted.slice(0, 8);
+                        
+                        const numberSimilarity = this.calculateSimilarity(inputNumbers, extractedNumbers);
+                        
+                        // Accept if letter matches and numbers are very similar (>87.5% = max 1 digit different)
+                        return inputLetter === extractedLetter && numberSimilarity >= 0.875;
+                    }
+                    
+                    // For other cases, check if one contains the other (partial matches)
+                    return cleanInput.includes(cleanExtracted) || cleanExtracted.includes(cleanInput);
+                },
+
+                compareBirthDate(input, extracted) {
+                    if (!input || !extracted || extracted === 'No encontrado en DNI') return false;
+                    
+                    // Normalize date formats
+                    const normalizeDate = (date) => {
+                        return date.replace(/[-\s]/g, '/').replace(/\/+/g, '/');
+                    };
+                    
+                    const normalizedInput = normalizeDate(input);
+                    const normalizedExtracted = normalizeDate(extracted);
+                    
+                    // Direct match
+                    if (normalizedInput === normalizedExtracted) return true;
+                    
+                    // Parse dates to compare components
+                    const parseDate = (dateStr) => {
+                        const parts = dateStr.split('/');
+                        if (parts.length === 3) {
+                            return {
+                                day: parseInt(parts[0]),
+                                month: parseInt(parts[1]),
+                                year: parseInt(parts[2])
+                            };
+                        }
+                        return null;
+                    };
+                    
+                    const inputDate = parseDate(normalizedInput);
+                    const extractedDate = parseDate(normalizedExtracted);
+                    
+                    // Compare individual components (allows for minor OCR errors)
+                    if (inputDate && extractedDate) {
+                        return inputDate.day === extractedDate.day &&
+                               inputDate.month === extractedDate.month &&
+                               inputDate.year === extractedDate.year;
+                    }
+                    
+                    // Fallback: check if the strings are very similar
+                    return this.calculateSimilarity(normalizedInput, normalizedExtracted) > 0.9;
+                },
+
+                compareAddress(input, extracted) {
+                    if (!input || !extracted || extracted === 'No encontrado en DNI') return false;
+                    
+                    // For address, we use similarity matching since OCR might not be perfect
+                    const cleanInput = input.replace(/[^A-ZÁÉÍÓÚÑ0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+                    const cleanExtracted = extracted.replace(/[^A-ZÁÉÍÓÚÑ0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+                    
+                    return this.calculateSimilarity(cleanInput, cleanExtracted) > 0.6; // 60% similarity
+                },
+
+                calculateSimilarity(str1, str2) {
+                    if (str1.length === 0 && str2.length === 0) return 1;
+                    if (str1.length === 0 || str2.length === 0) return 0;
+                    
+                    const longer = str1.length > str2.length ? str1 : str2;
+                    const shorter = str1.length > str2.length ? str2 : str1;
+                    
+                    if (longer.length === 0) return 1;
+                    
+                    const distance = this.levenshteinDistance(longer, shorter);
+                    return (longer.length - distance) / longer.length;
+                },
+
+                levenshteinDistance(str1, str2) {
+                    const matrix = Array(str2.length + 1).fill().map(() => Array(str1.length + 1).fill(0));
+                    
+                    for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
+                    for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
+                    
+                    for (let j = 1; j <= str2.length; j++) {
+                        for (let i = 1; i <= str1.length; i++) {
+                            const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+                            matrix[j][i] = Math.min(
+                                matrix[j][i - 1] + 1,
+                                matrix[j - 1][i] + 1,
+                                matrix[j - 1][i - 1] + cost
+                            );
+                        }
+                    }
+                    
+                    return matrix[str2.length][str1.length];
+                },
+
+                showError(message) {
+                    this.errorMessage = message;
+                    setTimeout(() => this.errorMessage = '', 5000);
+                },
+
+                // Utility function to convert data URL to File
+                dataURLtoFile(dataurl, filename) {
+                    if (!dataurl) return null;
+                    
+                    // Note: blob URLs are handled separately in async context
+                    if (dataurl.startsWith('blob:')) {
+                        throw new Error('Blob URLs should be handled asynchronously');
+                    }
+                    
+                    // Handle data URLs (for images)
+                    try {
+                        const arr = dataurl.split(',');
+                        const mime = arr[0].match(/:(.*?);/)[1];
+                        const bstr = atob(arr[1]);
+                        let n = bstr.length;
+                        const u8arr = new Uint8Array(n);
+                        while (n--) {
+                            u8arr[n] = bstr.charCodeAt(n);
+                        }
+                        return new File([u8arr], filename, { type: mime });
+                    } catch (error) {
+                        console.error('Error converting dataURL to File:', error);
+                        return null;
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
