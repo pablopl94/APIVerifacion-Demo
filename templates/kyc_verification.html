@@ -102,17 +102,28 @@
                             
                             <div class="grid md:grid-cols-2 gap-4">
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">Número de DNI</label>
-                                    <input x-model="userData.dni" type="text" placeholder="12345678X" maxlength="9"
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Número de Documento</label>
+                                    <input x-model="userData.documentNumber" type="text" placeholder="12345678X / AB123456C" 
                                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">Sexo</label>
-                                    <select x-model="userData.sex" 
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Nacionalidad</label>
+                                    <select x-model="userData.nationality" 
                                             class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                        <option value="">Seleccionar</option>
-                                        <option value="M">Masculino</option>
-                                        <option value="F">Femenino</option>
+                                        <option value="">Seleccionar país</option>
+                                        <option value="ESP">España (DNI)</option>
+                                        <option value="FRA">Francia (CNI)</option>
+                                        <option value="ITA">Italia (CI)</option>
+                                        <option value="PRT">Portugal (CC)</option>
+                                        <option value="DEU">Alemania (Personalausweis)</option>
+                                        <option value="GBR">Reino Unido (ID Card)</option>
+                                        <option value="USA">Estados Unidos (ID Card)</option>
+                                        <option value="MEX">México (INE)</option>
+                                        <option value="ARG">Argentina (DNI)</option>
+                                        <option value="COL">Colombia (CC)</option>
+                                        <option value="PER">Perú (DNI)</option>
+                                        <option value="CHL">Chile (CI)</option>
+                                        <option value="VEN">Venezuela (CI)</option>
                                     </select>
                                 </div>
                             </div>
@@ -123,16 +134,17 @@
                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                             </div>
                             
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Nacionalidad</label>
-                                <input x-model="userData.nationality" type="text" value="ESP" readonly
-                                       class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-600">
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Domicilio (Dirección completa)</label>
-                                <textarea x-model="userData.address" placeholder="Ej: Calle Mayor, 123, 2º A, 28001 Madrid" rows="3"
-                                          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
+                            <div class="grid md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Fecha de expedición</label>
+                                    <input x-model="userData.issueDate" type="date" 
+                                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Fecha de validez</label>
+                                    <input x-model="userData.expiryDate" type="date" 
+                                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                </div>
                             </div>
                         </div>
 
@@ -151,16 +163,32 @@
                             <!-- Preview DNI -->
                             <div x-show="dniPhotoPreview" class="mt-4">
                                 <img :src="dniPhotoPreview" class="w-full h-48 object-cover rounded-lg shadow-lg">
-                                <div class="mt-3 p-3 bg-blue-50 rounded-lg text-center">
-                                    <i class="fas fa-info-circle text-blue-600 mr-2"></i>
-                                    <span class="text-blue-800">La validación se realizará automáticamente al continuar</span>
+                            </div>
+
+                            <!-- Validation Success Message -->
+                            <div x-show="dniValidationPassed && extractedText" class="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                                <div class="flex items-start">
+                                    <i class="fas fa-check-circle text-green-600 mr-3 mt-1"></i>
+                                    <div>
+                                        <h4 class="font-semibold text-green-800 mb-2">✅ Documento Validado Correctamente</h4>
+                                        <p class="text-sm text-green-700 mb-3">Todos los datos coinciden. El documento es válido y corresponde a la nacionalidad seleccionada.</p>
+                                        <details class="text-xs">
+                                            <summary class="cursor-pointer text-green-600 hover:text-green-800">Ver texto extraído (debug)</summary>
+                                            <pre x-text="extractedText" class="text-green-700 mt-2 p-2 bg-green-100 rounded whitespace-pre-wrap max-h-24 overflow-y-auto"></pre>
+                                        </details>
+                                    </div>
                                 </div>
                             </div>
 
-                            <!-- Extracted Text -->
-                            <div x-show="extractedText" class="mt-4 p-4 bg-gray-50 rounded-lg">
-                                <h4 class="font-semibold text-gray-800 mb-2">Texto extraído:</h4>
-                                <pre x-text="extractedText" class="text-sm text-gray-700 whitespace-pre-wrap"></pre>
+                            <!-- Validation Error Message -->
+                            <div x-show="dniPhotoPreview && !processing && !dniValidationPassed && step1Result" class="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                                <div class="flex items-start">
+                                    <i class="fas fa-exclamation-triangle text-red-600 mr-3 mt-1"></i>
+                                    <div>
+                                        <h4 class="font-semibold text-red-800 mb-2">❌ Error en Validación del Documento</h4>
+                                        <p class="text-sm text-red-700 mb-3">Los datos no coinciden con el documento. Corrige los datos o sube una foto más clara y vuelve a hacer clic en "Continuar".</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -171,7 +199,7 @@
                                 class="px-8 py-3 text-white rounded-lg font-medium transition-colors">
                             <span x-show="!processing">Continuar <i class="fas fa-arrow-right ml-2"></i></span>
                             <span x-show="processing">
-                                <i class="fas fa-spinner fa-spin mr-2"></i>Validando DNI...
+                                <i class="fas fa-spinner fa-spin mr-2"></i>Validando documento...
                             </span>
                         </button>
                     </div>
@@ -502,21 +530,56 @@
                                 
                                 <!-- OCR Results -->
                                 <div class="mb-6 p-4 bg-white rounded-lg border">
-                                    <h5 class="font-medium text-gray-800 mb-3">📄 Datos Extraídos del DNI (OCR):</h5>
+                                    <h5 class="font-medium text-gray-800 mb-3">📄 Datos Extraídos del Documento (OCR):</h5>
                                     <div class="bg-gray-100 rounded-lg p-3 mb-3">
-                                        <pre x-text="extractedText || 'Sin datos extraídos'" class="text-sm text-gray-700 whitespace-pre-wrap max-h-32 overflow-y-auto"></pre>
+                                        <pre x-text="verificationResult.extracted_text || extractedText || 'Sin datos extraídos'" class="text-sm text-gray-700 whitespace-pre-wrap max-h-32 overflow-y-auto"></pre>
                                     </div>
                                     <div class="flex items-center">
                                         <span class="text-gray-600 mr-2">Estado OCR:</span>
-                                        <span :class="verificationResult.dataExtracted ? 'text-green-600' : 'text-red-600'" class="font-medium">
-                                            <i :class="verificationResult.dataExtracted ? 'fas fa-check' : 'fas fa-times'" class="mr-1"></i>
-                                            <span x-text="verificationResult.dataExtracted ? 'Texto extraído correctamente' : 'Error en extracción de texto'"></span>
+                                        <span :class="(verificationResult.extracted_text || extractedText) ? 'text-green-600' : 'text-red-600'" class="font-medium">
+                                            <i :class="(verificationResult.extracted_text || extractedText) ? 'fas fa-check' : 'fas fa-times'" class="mr-1"></i>
+                                            <span x-text="(verificationResult.extracted_text || extractedText) ? 'Texto extraído correctamente' : 'Error en extracción de texto'"></span>
                                         </span>
                                     </div>
                                 </div>
 
+                                <!-- Document Analysis Section -->
+                                <div x-show="verificationResult && (verificationResult.document_analysis || verificationResult.success)" class="mb-6 p-4 bg-white rounded-lg border">
+                                    <h5 class="font-medium text-gray-800 mb-4">🌍 Verificación de Documento Internacional</h5>
+                                    
+                                    <div class="space-y-4">
+                                        <!-- Document Type & Country Verification -->
+                                        <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                            <div class="flex justify-between items-center mb-2">
+                                                <h6 class="font-medium text-blue-800">Tipo de Documento:</h6>
+                                                <span class="text-blue-700 font-semibold" x-text="verificationResult.document_analysis.document_type"></span>
+                                            </div>
+                                            <div class="flex justify-between items-center">
+                                                <span class="text-sm text-gray-600">Correspondencia con país:</span>
+                                                <span :class="verificationResult.document_analysis.country_match ? 'text-green-600' : 'text-red-600'" class="font-medium">
+                                                    <i :class="verificationResult.document_analysis.country_match ? 'fas fa-check-circle' : 'fas fa-times-circle'" class="mr-1"></i>
+                                                    <span x-text="verificationResult.document_analysis.country_match ? 'VÁLIDO' : 'NO VÁLIDO'"></span>
+                                                </span>
+                                            </div>
+                                            <div x-show="!verificationResult.document_analysis.country_match" class="mt-2 text-sm text-red-600">
+                                                ⚠️ El documento no corresponde al país seleccionado
+                                            </div>
+                                        </div>
+
+                                        <!-- Document Validity -->
+                                        <div class="p-3 rounded-lg" :class="verificationResult.document_analysis.is_valid_document ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'">
+                                            <div class="flex items-center">
+                                                <i :class="verificationResult.document_analysis.is_valid_document ? 'fas fa-certificate text-green-600' : 'fas fa-exclamation-triangle text-red-600'" class="mr-2"></i>
+                                                <span class="font-medium" :class="verificationResult.document_analysis.is_valid_document ? 'text-green-800' : 'text-red-800'">
+                                                    <span x-text="verificationResult.document_analysis.is_valid_document ? 'Documento Válido' : 'Documento Inválido'"></span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <!-- Data Comparison Section -->
-                                <div x-show="verificationResult.dataComparison" class="mb-6 p-4 bg-white rounded-lg border">
+                                <div x-show="verificationResult && (verificationResult.data_matches || verificationResult.success)" class="mb-6 p-4 bg-white rounded-lg border">
                                     <h5 class="font-medium text-gray-800 mb-4">📊 Comparación de Datos: Insertados vs Extraídos</h5>
                                     
                                     <div class="space-y-3">
@@ -527,33 +590,33 @@
                                             </div>
                                             <div>
                                                 <span class="text-sm text-blue-700">Insertado:</span>
-                                                <p class="font-medium" x-text="verificationResult.dataComparison.name.input"></p>
+                                                <p class="font-medium" x-text="userData.firstName + ' ' + userData.lastName"></p>
                                             </div>
                                             <div>
                                                 <span class="text-sm text-purple-700">Extraído:</span>
-                                                <p class="font-medium" x-text="verificationResult.dataComparison.name.extracted"></p>
-                                                <span :class="verificationResult.dataComparison.name.match ? 'text-green-600' : 'text-red-600'" class="text-sm">
-                                                    <i :class="verificationResult.dataComparison.name.match ? 'fas fa-check' : 'fas fa-times'" class="mr-1"></i>
-                                                    <span x-text="verificationResult.dataComparison.name.match ? 'Coincide' : 'No coincide'"></span>
+                                                <p class="font-medium" x-text="verificationResult.extracted_data?.name || 'No extraído'"></p>
+                                                <span :class="verificationResult.data_matches?.name ? 'text-green-600' : 'text-red-600'" class="text-sm">
+                                                    <i :class="verificationResult.data_matches?.name ? 'fas fa-check' : 'fas fa-times'" class="mr-1"></i>
+                                                    <span x-text="verificationResult.data_matches?.name ? 'Coincide' : 'No coincide'"></span>
                                                 </span>
                                             </div>
                                         </div>
 
-                                        <!-- DNI comparison -->
+                                        <!-- Document Number comparison -->
                                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 border rounded-lg">
                                             <div>
-                                                <span class="text-sm font-medium text-gray-600">DNI:</span>
+                                                <span class="text-sm font-medium text-gray-600">Número de Documento:</span>
                                             </div>
                                             <div>
                                                 <span class="text-sm text-blue-700">Insertado:</span>
-                                                <p class="font-medium" x-text="verificationResult.dataComparison.dni.input"></p>
+                                                <p class="font-medium" x-text="userData.documentNumber"></p>
                                             </div>
                                             <div>
                                                 <span class="text-sm text-purple-700">Extraído:</span>
-                                                <p class="font-medium" x-text="verificationResult.dataComparison.dni.extracted"></p>
-                                                <span :class="verificationResult.dataComparison.dni.match ? 'text-green-600' : 'text-red-600'" class="text-sm">
-                                                    <i :class="verificationResult.dataComparison.dni.match ? 'fas fa-check' : 'fas fa-times'" class="mr-1"></i>
-                                                    <span x-text="verificationResult.dataComparison.dni.match ? 'Coincide' : 'No coincide'"></span>
+                                                <p class="font-medium" x-text="verificationResult.extracted_data?.document_number || 'No extraído'"></p>
+                                                <span :class="verificationResult.data_matches?.document_number ? 'text-green-600' : 'text-red-600'" class="text-sm">
+                                                    <i :class="verificationResult.data_matches?.document_number ? 'fas fa-check' : 'fas fa-times'" class="mr-1"></i>
+                                                    <span x-text="verificationResult.data_matches?.document_number ? 'Coincide' : 'No coincide'"></span>
                                                 </span>
                                             </div>
                                         </div>
@@ -565,47 +628,111 @@
                                             </div>
                                             <div>
                                                 <span class="text-sm text-blue-700">Insertado:</span>
-                                                <p class="font-medium" x-text="verificationResult.dataComparison.birthDate.input"></p>
+                                                <p class="font-medium" x-text="userData.birthDate"></p>
                                             </div>
                                             <div>
                                                 <span class="text-sm text-purple-700">Extraído:</span>
-                                                <p class="font-medium" x-text="verificationResult.dataComparison.birthDate.extracted"></p>
-                                                <span :class="verificationResult.dataComparison.birthDate.match ? 'text-green-600' : 'text-red-600'" class="text-sm">
-                                                    <i :class="verificationResult.dataComparison.birthDate.match ? 'fas fa-check' : 'fas fa-times'" class="mr-1"></i>
-                                                    <span x-text="verificationResult.dataComparison.birthDate.match ? 'Coincide' : 'No coincide'"></span>
+                                                <p class="font-medium" x-text="verificationResult.extracted_data?.birthdate || 'No extraído'"></p>
+                                                <span :class="verificationResult.data_matches?.birthdate ? 'text-green-600' : 'text-red-600'" class="text-sm">
+                                                    <i :class="verificationResult.data_matches?.birthdate ? 'fas fa-check' : 'fas fa-times'" class="mr-1"></i>
+                                                    <span x-text="verificationResult.data_matches?.birthdate ? 'Coincide' : 'No coincide'"></span>
                                                 </span>
                                             </div>
                                         </div>
 
-                                        <!-- Address comparison -->
+                                        <!-- Issue Date comparison -->
                                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 border rounded-lg">
                                             <div>
-                                                <span class="text-sm font-medium text-gray-600">Domicilio:</span>
+                                                <span class="text-sm font-medium text-gray-600">Fecha Expedición:</span>
                                             </div>
                                             <div>
                                                 <span class="text-sm text-blue-700">Insertado:</span>
-                                                <p class="font-medium text-xs" x-text="verificationResult.dataComparison.address.input"></p>
+                                                <p class="font-medium" x-text="userData.issueDate"></p>
                                             </div>
                                             <div>
                                                 <span class="text-sm text-purple-700">Extraído:</span>
-                                                <p class="font-medium text-xs" x-text="verificationResult.dataComparison.address.extracted"></p>
-                                                <span :class="verificationResult.dataComparison.address.match ? 'text-green-600' : 'text-red-600'" class="text-sm">
-                                                    <i :class="verificationResult.dataComparison.address.match ? 'fas fa-check' : 'fas fa-times'" class="mr-1"></i>
-                                                    <span x-text="verificationResult.dataComparison.address.match ? 'Coincide' : 'No coincide'"></span>
+                                                <p class="font-medium" x-text="verificationResult.extracted_data?.issue_date || 'No extraído'"></p>
+                                                <span :class="verificationResult.data_matches?.issue_date ? 'text-green-600' : 'text-red-600'" class="text-sm">
+                                                    <i :class="verificationResult.data_matches?.issue_date ? 'fas fa-check' : 'fas fa-times'" class="mr-1"></i>
+                                                    <span x-text="verificationResult.data_matches?.issue_date ? 'Coincide' : 'No coincide'"></span>
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <!-- Expiry Date comparison -->
+                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 border rounded-lg">
+                                            <div>
+                                                <span class="text-sm font-medium text-gray-600">Fecha Validez:</span>
+                                            </div>
+                                            <div>
+                                                <span class="text-sm text-blue-700">Insertado:</span>
+                                                <p class="font-medium" x-text="userData.expiryDate"></p>
+                                            </div>
+                                            <div>
+                                                <span class="text-sm text-purple-700">Extraído:</span>
+                                                <p class="font-medium" x-text="verificationResult.extracted_data?.expiry_date || 'No extraído'"></p>
+                                                <span :class="verificationResult.data_matches?.expiry_date ? 'text-green-600' : 'text-red-600'" class="text-sm">
+                                                    <i :class="verificationResult.data_matches?.expiry_date ? 'fas fa-check' : 'fas fa-times'" class="mr-1"></i>
+                                                    <span x-text="verificationResult.data_matches?.expiry_date ? 'Coincide' : 'No coincide'"></span>
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <!-- Country/Nationality comparison -->
+                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 border rounded-lg">
+                                            <div>
+                                                <span class="text-sm font-medium text-gray-600">País/Nacionalidad:</span>
+                                            </div>
+                                            <div>
+                                                <span class="text-sm text-blue-700">Seleccionado:</span>
+                                                <p class="font-medium" x-text="userData.nationality"></p>
+                                            </div>
+                                            <div>
+                                                <span class="text-sm text-purple-700">Del Documento:</span>
+                                                <p class="font-medium" x-text="verificationResult.extracted_data?.nationality || 'No extraído'"></p>
+                                                <span :class="verificationResult.data_matches?.country ? 'text-green-600' : 'text-red-600'" class="text-sm">
+                                                    <i :class="verificationResult.data_matches?.country ? 'fas fa-check' : 'fas fa-times'" class="mr-1"></i>
+                                                    <span x-text="verificationResult.data_matches?.country ? 'Coincide' : 'No coincide'"></span>
                                                 </span>
                                             </div>
                                         </div>
                                     </div>
 
                                     <!-- Summary of data matching -->
-                                    <div class="mt-4 p-3 rounded-lg" :class="verificationResult.dataComparison.overallMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'">
-                                        <div class="flex items-center">
-                                            <i :class="verificationResult.dataComparison.overallMatch ? 'fas fa-check-circle text-green-600' : 'fas fa-times-circle text-red-600'" class="mr-2"></i>
-                                            <span class="font-medium" :class="verificationResult.dataComparison.overallMatch ? 'text-green-800' : 'text-red-800'">
-                                                Coincidencias de datos: <span x-text="verificationResult.dataComparison.matchCount"></span> de <span x-text="verificationResult.dataComparison.totalFields"></span>
-                                            </span>
+                                    <div class="mt-4 p-3 rounded-lg bg-blue-50 border border-blue-200">
+                                        <div class="flex items-center mb-2">
+                                            <i class="fas fa-chart-bar text-blue-600 mr-2"></i>
+                                            <span class="font-medium text-blue-800">Resumen de Verificación de Datos</span>
                                         </div>
-                                        <p class="text-sm mt-1" :class="verificationResult.dataComparison.overallMatch ? 'text-green-700' : 'text-red-700'" x-text="verificationResult.dataComparison.summary"></p>
+                                        <div class="grid grid-cols-2 gap-4 text-sm">
+                                            <div class="flex items-center">
+                                                <span class="text-gray-600 mr-2">Nombre:</span>
+                                                <i :class="verificationResult.data_matches?.name ? 'fas fa-check text-green-600' : 'fas fa-times text-red-600'"></i>
+                                            </div>
+                                            <div class="flex items-center">
+                                                <span class="text-gray-600 mr-2">Documento:</span>
+                                                <i :class="verificationResult.data_matches?.document_number ? 'fas fa-check text-green-600' : 'fas fa-times text-red-600'"></i>
+                                            </div>
+                                            <div class="flex items-center">
+                                                <span class="text-gray-600 mr-2">Nacimiento:</span>
+                                                <i :class="verificationResult.data_matches?.birthdate ? 'fas fa-check text-green-600' : 'fas fa-times text-red-600'"></i>
+                                            </div>
+                                            <div class="flex items-center">
+                                                <span class="text-gray-600 mr-2">Expedición:</span>
+                                                <i :class="verificationResult.data_matches?.issue_date ? 'fas fa-check text-green-600' : 'fas fa-times text-red-600'"></i>
+                                            </div>
+                                            <div class="flex items-center">
+                                                <span class="text-gray-600 mr-2">Validez:</span>
+                                                <i :class="verificationResult.data_matches?.expiry_date ? 'fas fa-check text-green-600' : 'fas fa-times text-red-600'"></i>
+                                            </div>
+                                            <div class="flex items-center">
+                                                <span class="text-gray-600 mr-2">País:</span>
+                                                <i :class="verificationResult.data_matches?.country ? 'fas fa-check text-green-600' : 'fas fa-times text-red-600'"></i>
+                                            </div>
+                                        </div>
+                                        <div class="mt-3 p-2 bg-white rounded border">
+                                            <p class="text-sm text-gray-700" x-text="verificationResult.details || 'Verificación completada'"></p>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -716,11 +843,11 @@
                 userData: {
                     firstName: '',
                     lastName: '',
-                    dni: '',
-                    sex: '',
+                    documentNumber: '',
+                    nationality: '',
                     birthDate: '',
-                    nationality: 'ESP',
-                    address: ''
+                    issueDate: '',
+                    expiryDate: ''
                 },
                 dniPhotoFile: null,
                 dniPhotoPreview: null,
@@ -918,9 +1045,11 @@
                         const formData = new FormData();
                         formData.append('firstName', this.userData.firstName);
                         formData.append('lastName', this.userData.lastName);
-                        formData.append('dni', this.userData.dni);
+                        formData.append('documentNumber', this.userData.documentNumber);
+                        formData.append('nationality', this.userData.nationality);
                         formData.append('birthDate', this.userData.birthDate);
-                        formData.append('address', this.userData.address);
+                        formData.append('issueDate', this.userData.issueDate);
+                        formData.append('expiryDate', this.userData.expiryDate);
                         formData.append('dniImageFront', this.dniPhotoFile);
                         
                         const dniResponse = await fetch('/kyc/validate-dni', {
@@ -939,24 +1068,6 @@
                         this.step1Result = dniResult;
                         this.dniPhotoPath = dniResult.dni_front_path;
                         
-                        // Mostrar texto extraído para debugging
-                        this.extractedText = dniResult.extracted_text || 'Datos extraídos con GPT-4 Vision';
-                        
-                        // Guardar datos GPT para mostrar después
-                        if (dniResult.success) {
-                            this.gptVerification = {
-                                name_match: dniResult.data_matches?.name || false,
-                                dni_match: dniResult.data_matches?.dni || false,
-                                birthdate_match: dniResult.data_matches?.birthdate || false,
-                                address_match: dniResult.data_matches?.address || false,
-                                overall_confidence: dniResult.confidence || 0,
-                                recommendation: dniResult.recommendation || 'REVIEW'
-                            };
-                            
-                            this.gptExtractedData = dniResult.extracted_data || {};
-                            this.gptDetails = dniResult.details || 'Análisis completado con GPT-4 Vision';
-                        }
-                        
                         // Determinar si puede pasar al siguiente paso
                         this.dniValidationPassed = dniResult.success && 
                                                    dniResult.recommendation !== 'REJECT' && 
@@ -964,10 +1075,29 @@
                         
                         if (this.dniValidationPassed) {
                             console.log('✅ DNI validado correctamente - puede continuar');
+                            // Solo mostrar texto extraído si es exitoso
+                            this.extractedText = dniResult.extracted_text || 'Datos extraídos con GPT-4 Vision';
                             this.showSuccess('DNI validado correctamente. Puede continuar al siguiente paso.');
+                            
+                            // Guardar datos GPT para mostrar después
+                            this.gptVerification = {
+                                name_match: dniResult.data_matches?.name || false,
+                                dni_match: dniResult.data_matches?.document_number || false,
+                                birthdate_match: dniResult.data_matches?.birthdate || false,
+                                address_match: dniResult.data_matches?.address || false,
+                                overall_confidence: dniResult.confidence || 0,
+                                recommendation: dniResult.recommendation || 'REVIEW'
+                            };
+                            this.gptExtractedData = dniResult.extracted_data || {};
+                            this.gptDetails = dniResult.details || 'Análisis completado con GPT-4 Vision';
                         } else {
                             console.log('❌ DNI no válido - no puede continuar');
-                            this.showError(`DNI no validado: ${dniResult.recommendation}. Confianza: ${dniResult.confidence}%`);
+                            
+                            // NO mostrar texto extraído en caso de error
+                            this.extractedText = '';
+                            
+                            // Mensaje de error sencillo
+                            this.showError('Los datos del documento no coinciden con la información proporcionada. Verifique los datos introducidos o suba una foto más clara del documento.');
                         }
                         
                     } catch (error) {
@@ -980,13 +1110,25 @@
                 },
 
                 canProceedStep1() {
+                    // Solo verificar que los campos básicos estén llenos, no la validación aún
                     return this.userData.firstName && 
                            this.userData.lastName &&
-                           this.userData.dni && 
-                           this.userData.sex &&
+                           this.userData.documentNumber && 
+                           this.userData.nationality &&
                            this.userData.birthDate && 
-                           this.userData.address &&
-                           this.dniPhotoFile; // Solo requiere que todos los campos estén completos
+                           this.userData.issueDate &&
+                           this.userData.expiryDate &&
+                           this.dniPhotoFile; // Campos básicos obligatorios
+                },
+
+                retryDocumentValidation() {
+                    // Resetear el estado de validación para permitir un nuevo intento
+                    this.dniValidationPassed = false;
+                    this.step1Result = null;
+                    this.extractedText = '';
+                    this.errorMessage = '';
+                    
+                    console.log('🔄 Estado de validación reseteado - listo para nuevo intento');
                 },
 
                 // Step 2 Functions
@@ -1435,6 +1577,14 @@
                             dniMatch: selfiePassed,  // DNI vs Selfie del paso 2
                             videoMatch: livenessPassed,  // Selfie vs Video del paso 3
                             dataExtracted: dniPassed,  // Extracción de datos del paso 1
+                            
+                            // NUEVOS: Datos del paso 1 (document validation)
+                            document_analysis: this.step1Result?.document_analysis || {},
+                            data_matches: this.step1Result?.data_matches || {},
+                            extracted_data: this.step1Result?.extracted_data || {},
+                            extracted_text: this.step1Result?.extracted_text || this.extractedText || '',
+                            details: this.step1Result?.details || 'Verificación completada',
+                            
                             dataComparison,
                             overallConfidence,
                             debugInfo: {

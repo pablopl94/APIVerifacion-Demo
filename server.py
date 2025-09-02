@@ -24,6 +24,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import numpy as np
 from deepface import DeepFace
+from mtcnn.mtcnn import MTCNN
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -162,17 +163,19 @@ def validate_dni():
         # 1. Recibir datos del formulario
         first_name = request.form.get('firstName', '').strip()
         last_name = request.form.get('lastName', '').strip()
-        dni_number = request.form.get('dni', '').strip()
+        document_number = request.form.get('documentNumber', '').strip()
+        nationality = request.form.get('nationality', '').strip()
         birth_date = request.form.get('birthDate', '').strip()
-        address = request.form.get('address', '').strip()
+        issue_date = request.form.get('issueDate', '').strip()
+        expiry_date = request.form.get('expiryDate', '').strip()
         
-        print(f"📋 Datos recibidos: {first_name} {last_name}, DNI: {dni_number}")
+        print(f"📋 Datos recibidos: {first_name} {last_name}, Doc: {document_number}, País: {nationality}")
         
         # Validar que se recibieron todos los datos obligatorios
-        if not all([first_name, last_name, dni_number, birth_date]):
+        if not all([first_name, last_name, document_number, nationality, birth_date, issue_date, expiry_date]):
             return jsonify({
                 "success": False,
-                "error": "Faltan datos obligatorios: firstName, lastName, dni, birthDate",
+                "error": "Faltan datos obligatorios: firstName, lastName, documentNumber, nationality, birthDate, issueDate, expiryDate",
                 "confidence": 0,
                 "recommendation": "REJECT"
             }), 400
@@ -204,26 +207,19 @@ def validate_dni():
         
         print(f"📋 DNI guardado en: {dni_front_path}")
         
-        # 4. Procesar DNI trasero si se proporciona
-        dni_back_path = None
-        if dni_back_file and dni_back_file.filename != '':
-            if allowed_file(dni_back_file.filename):
-                dni_back_filename = str(uuid.uuid4()) + '_dni_back_' + secure_filename(dni_back_file.filename)
-                dni_back_path = os.path.join(UPLOAD_FOLDER, dni_back_filename)
-                dni_back_file.save(dni_back_path)
-                print(f"📋 DNI trasero guardado en: {dni_back_path}")
-        
-        # 5. Usar GPT Vision para extraer y comparar datos
+        # 4. Usar GPT Vision para extraer y comparar datos
+        # Análisis con GPT Vision de la cara delantera
         user_data = {
             'firstName': first_name,
             'lastName': last_name,
-            'dni': dni_number,
+            'documentNumber': document_number,
+            'nationality': nationality,
             'birthDate': birth_date,
-            'address': address
+            'issueDate': issue_date,
+            'expiryDate': expiry_date
         }
         
-        # Análisis con GPT Vision de la cara delantera
-        print("🧠 Analizando DNI con GPT Vision...")
+        print("🧠 Analizando documento con GPT Vision...")
         gpt_result = analyze_and_compare_dni_with_gpt(dni_front_path, user_data)
         
         # Intentar parsear resultado JSON de GPT
@@ -239,16 +235,18 @@ def validate_dni():
                 "confidence": result_data.get('verification', {}).get('overall_confidence', 0),
                 "data_matches": {
                     "name": result_data.get('verification', {}).get('name_match', False),
-                    "dni": result_data.get('verification', {}).get('dni_match', False),
+                    "document_number": result_data.get('verification', {}).get('document_number_match', False),
                     "birthdate": result_data.get('verification', {}).get('birthdate_match', False),
-                    "address": result_data.get('verification', {}).get('address_match', False)
+                    "issue_date": result_data.get('verification', {}).get('issue_date_match', False),
+                    "expiry_date": result_data.get('verification', {}).get('expiry_date_match', False),
+                    "country": result_data.get('verification', {}).get('country_verification', False)
                 },
+                "document_analysis": result_data.get('document_analysis', {}),
                 "extracted_data": result_data.get('extracted_data', {}),
                 "extracted_text": result_data.get('extracted_text', ''),
                 "details": result_data.get('details', ''),
                 "recommendation": result_data.get('verification', {}).get('recommendation', 'REVIEW'),
-                "dni_front_path": dni_front_path.replace('\\', '/'),
-                "dni_back_path": dni_back_path.replace('\\', '/') if dni_back_path else None
+                "dni_front_path": dni_front_path.replace('\\', '/')
             }
             
             print(f"✅ Validación completada - Confianza: {response['confidence']}%")
@@ -272,7 +270,7 @@ def validate_dni():
 @app.route('/kyc/verify-selfie', methods=['POST'])
 def verify_selfie():
     """
-    🤳 PASO 2: Verificar que el selfie coincide con la persona del DNI
+    PASO 2: Verificar que el selfie coincide con la persona del DNI
     
     Recibe:
     - dniImagePath: Ruta de la imagen DNI ya procesada (del paso anterior)
@@ -294,7 +292,7 @@ def verify_selfie():
     }
     """
     try:
-        print("🤳 VERIFICANDO SELFIE - Comparación con DNI")
+        print("VERIFICANDO SELFIE - Comparación con DNI")
         
         # 1. Recibir ruta de imagen DNI ya procesada
         dni_image_path = request.form.get('dniImagePath', '').strip()
@@ -349,7 +347,7 @@ def verify_selfie():
         print(f"🤳 Comparando con DNI: {dni_image_path}")
         
         # 4. Usar face_recognition para comparar caras DNI vs Selfie
-        print("🧠 Comparando caras con face_recognition...")
+        print("Comparando caras con face_recognition...")
         comparison_result = compare_faces_with_face_recognition(dni_image_path, selfie_path)
         
         # 5. Estructurar respuesta del endpoint
@@ -857,90 +855,291 @@ def compare_faces_with_face_recognition(image1_path, image2_path):
         
         print(f"📊 Calidad - DNI: {quality_dni['overall_score']}/100, Selfie: {quality_selfie['overall_score']}/100")
         
-        # 2. DETECCIÓN MÚLTIPLE DE CARAS (sistema de fallback)
-        detectors = ['retinaface', 'mtcnn', 'opencv', 'mediapipe']
-        dni_detection = None
-        selfie_detection = None
+        # Usar imagen completa del DNI directamente
+        dni_path_for_comparison = image1_path
+        print("📄 Usando imagen completa del documento para comparación")
         
-        # Intentar detectar cara en DNI con múltiples detectores
-        for detector in detectors:
-            try:
-                print(f"🔍 Probando detector {detector} para DNI...")
-                faces_dni = DeepFace.extract_faces(
-                    img_path=image1_path,
-                    detector_backend=detector,
-                    enforce_detection=False,
-                    align=True,
-                    expand_percentage=10
-                )
-                if len(faces_dni) > 0 and faces_dni[0]['face'] is not None:
-                    dni_detection = {'detector': detector, 'faces': faces_dni}
-                    print(f"✅ Cara detectada en DNI usando {detector}")
-                    break
-            except Exception as e:
-                print(f"⚠️ Detector {detector} falló para DNI: {str(e)}")
-                continue
+        # 2. DETECCIÓN ROBUSTA CON FACE_RECOGNITION (evita falsos positivos como letras)
+        print("🔍 Detectando caras con face_recognition library (más preciso que DeepFace)...")
         
-        # Intentar detectar cara en Selfie
-        for detector in detectors:
-            try:
-                print(f"🔍 Probando detector {detector} para Selfie...")
-                faces_selfie = DeepFace.extract_faces(
-                    img_path=image2_path,
-                    detector_backend=detector,
-                    enforce_detection=False,
-                    align=True,
-                    expand_percentage=5
-                )
-                if len(faces_selfie) > 0 and faces_selfie[0]['face'] is not None:
-                    selfie_detection = {'detector': detector, 'faces': faces_selfie}
-                    print(f"✅ Cara detectada en Selfie usando {detector}")
-                    break
-            except Exception as e:
-                print(f"⚠️ Detector {detector} falló para Selfie: {str(e)}")
-                continue
-        
-        # 3. VALIDACIONES DE DETECCIÓN
-        if dni_detection is None:
-            if quality_dni['overall_score'] >= 50:
+        try:
+            # Cargar imágenes
+            dni_image = face_recognition.load_image_file(dni_path_for_comparison)
+            selfie_image = face_recognition.load_image_file(image2_path)
+            
+            # DETECCIÓN PRECISA: face_recognition NO confunde texto con caras
+            print("🔍 Detectando cara en DNI con modelo HOG (robusto para documentos)...")
+            dni_face_locations = face_recognition.face_locations(dni_image, model='hog', number_of_times_to_upsample=2)
+            
+            print("🔍 Detectando cara en Selfie con modelo CNN...")  
+            selfie_face_locations = face_recognition.face_locations(selfie_image, model='cnn')
+            
+            print(f"📊 Caras detectadas - DNI: {len(dni_face_locations)}, Selfie: {len(selfie_face_locations)}")
+            
+            # VALIDACIÓN
+            if len(dni_face_locations) == 0:
+                print("❌ No se detectó cara en el DNI")
                 return {
                     "face_match": False,
                     "confidence": 0,
-                    "analysis": "DNI de calidad aceptable pero no se pudo detectar ninguna cara con ningún algoritmo. Puede ser un documento especial o tener características no estándar.",
-                    "quality_check": {
-                        "dni_quality": quality_dni,
-                        "selfie_quality": quality_selfie
-                    },
-                    "fraud_indicators": ["Cara no detectable en documento con múltiples algoritmos"],
-                    "recommendation": "REVIEW"
-                }
-            else:
-                return {
-                    "face_match": False,
-                    "confidence": 0,
-                    "analysis": "Imagen del DNI de baja calidad. No se puede detectar cara debido a resolución insuficiente, desenfoque o mala iluminación.",
-                    "quality_check": {
-                        "dni_quality": quality_dni,
-                        "selfie_quality": quality_selfie
-                    },
-                    "fraud_indicators": ["DNI de calidad insuficiente para análisis"],
+                    "analysis": "No se pudo detectar una cara válida en el documento de identidad.",
+                    "fraud_indicators": ["No hay cara detectable en DNI"],
                     "recommendation": "REJECT"
                 }
-        
-        if selfie_detection is None:
+            
+            if len(selfie_face_locations) == 0:
+                print("❌ No se detectó cara en el selfie")
+                return {
+                    "face_match": False,
+                    "confidence": 0,
+                    "analysis": "No se pudo detectar una cara en el selfie.",
+                    "fraud_indicators": ["No hay cara detectable en selfie"],
+                    "recommendation": "REJECT"
+                }
+            
+            # Usar cara más grande si hay múltiples
+            if len(dni_face_locations) > 1:
+                print(f"⚠️ Múltiples caras en DNI, usando la más grande")
+                dni_face_locations = [max(dni_face_locations, key=lambda loc: (loc[2]-loc[0])*(loc[1]-loc[3]))]
+            
+            if len(selfie_face_locations) > 1:
+                print(f"⚠️ Múltiples caras en selfie, usando la más grande")
+                selfie_face_locations = [max(selfie_face_locations, key=lambda loc: (loc[2]-loc[0])*(loc[1]-loc[3]))]
+            
+            # Extraer encodings
+            dni_encodings = face_recognition.face_encodings(dni_image, dni_face_locations)
+            selfie_encodings = face_recognition.face_encodings(selfie_image, selfie_face_locations)
+            
+            if len(dni_encodings) == 0 or len(selfie_encodings) == 0:
+                print("❌ No se pudieron extraer características faciales")
+                return {
+                    "face_match": False,
+                    "confidence": 0,
+                    "analysis": "No se pudieron extraer características faciales.",
+                    "fraud_indicators": ["Fallo en extracción de características"],
+                    "recommendation": "REJECT"
+                }
+            
+            # Crear detecciones
+            dni_detection = {
+                'detector': 'face_recognition_hog',
+                'location': dni_face_locations[0],
+                'encoding': dni_encodings[0]
+            }
+            
+            selfie_detection = {
+                'detector': 'face_recognition_cnn',
+                'location': selfie_face_locations[0],
+                'encoding': selfie_encodings[0]
+            }
+            
+            print("✅ Detección facial completada con face_recognition")
+            
+        except Exception as e:
+            print(f"❌ Error en detección: {e}")
             return {
                 "face_match": False,
                 "confidence": 0,
-                "analysis": "No se pudo detectar ninguna cara en el selfie con ningún algoritmo de detección.",
-                "quality_check": {
-                    "dni_quality": quality_dni,
-                    "selfie_quality": quality_selfie
-                },
-                "fraud_indicators": ["Sin cara detectable en selfie"],
+                "analysis": f"Error en detección: {str(e)}",
+                "fraud_indicators": ["Error técnico"],
                 "recommendation": "REJECT"
             }
         
-        # 4. VERIFICACIÓN MÚLTIPLE CON DIFERENTES MODELOS
+        # 3. COMPARAR CARAS USANDO FACE_RECOGNITION
+        print("� Comparando caras con face_recognition...")
+        
+        # Calcular distancia euclidiana entre encodings
+        face_distance = face_recognition.face_distance([dni_detection['encoding']], selfie_detection['encoding'])[0]
+        
+        print(f"📊 Distancia facial: {face_distance:.4f}")
+        
+        # Determinar similitud - face_recognition usa threshold 0.6 por defecto
+        face_matches = face_recognition.compare_faces([dni_detection['encoding']], selfie_detection['encoding'], tolerance=0.6)
+        is_match = face_matches[0]
+        
+        # Calcular confianza (inverso de distancia)
+        confidence = max(0, min(100, (1 - face_distance) * 100))
+        
+        print(f"🎯 Resultado face_recognition: Match={is_match}, Distancia={face_distance:.4f}, Confianza={confidence:.1f}%")
+        
+        # 4. VALIDACIÓN DE GÉNERO HÍBRIDA (DeepFace + ChatGPT backup)
+        print("⚖️ Validando coherencia de género con sistema híbrido...")
+        
+        try:
+            dni_gender = None
+            selfie_gender = None
+            
+            # PASO 1: Intentar con DeepFace primero
+            try:
+                print("🔍 Intento 1: DeepFace con imagen completa...")
+                
+                # Usar imágenes completas (a veces funciona mejor para género)
+                dni_analysis = DeepFace.analyze(
+                    img_path=image1_path,  # Imagen completa del DNI
+                    actions=['gender'],
+                    detector_backend='opencv',  # Más estable
+                    enforce_detection=False
+                )
+                
+                selfie_analysis = DeepFace.analyze(
+                    img_path=image2_path,  # Imagen completa del selfie
+                    actions=['gender'],
+                    detector_backend='opencv',
+                    enforce_detection=False
+                )
+                
+                # Extraer géneros
+                if isinstance(dni_analysis, list) and len(dni_analysis) > 0:
+                    dni_gender = dni_analysis[0].get('dominant_gender', 'Unknown')
+                else:
+                    dni_gender = dni_analysis.get('dominant_gender', 'Unknown')
+                
+                if isinstance(selfie_analysis, list) and len(selfie_analysis) > 0:
+                    selfie_gender = selfie_analysis[0].get('dominant_gender', 'Unknown')
+                else:
+                    selfie_gender = selfie_analysis.get('dominant_gender', 'Unknown')
+                
+                print(f"   DeepFace - DNI: {dni_gender}, Selfie: {selfie_gender}")
+                
+            except Exception as e:
+                print(f"⚠️ DeepFace falló: {e}")
+                dni_gender = 'Unknown'
+                selfie_gender = 'Unknown'
+            
+            # PASO 2: Si DeepFace falla o da resultados inconsistentes, usar ChatGPT
+            if dni_gender == 'Unknown' or selfie_gender == 'Unknown' or dni_gender == selfie_gender:
+                print("🤖 Paso 2: Validación con ChatGPT como backup...")
+                
+                try:
+                    # Convertir imágenes a base64
+                    with open(image1_path, "rb") as dni_file:
+                        dni_base64 = base64.b64encode(dni_file.read()).decode('utf-8')
+                    
+                    with open(image2_path, "rb") as selfie_file:
+                        selfie_base64 = base64.b64encode(selfie_file.read()).decode('utf-8')
+                    
+                    # Prompt MUY ESPECÍFICO para evitar rechazos
+                    prompt = """Analiza estas dos imágenes para verificación de identidad:
+
+Imagen 1: Documento de identidad oficial
+Imagen 2: Selfie/foto actual de la persona
+
+SOLO necesito saber el género aparente de cada imagen:
+- ¿La persona en el documento parece hombre o mujer?
+- ¿La persona en el selfie parece hombre o mujer?
+
+Responde en formato JSON:
+{"dni": "hombre" o "mujer", "selfie": "hombre" o "mujer"}"""
+                    
+                    response = client.chat.completions.create(
+                        model="gpt-4o",
+                        messages=[
+                            {
+                                "role": "user", 
+                                "content": [
+                                    {"type": "text", "text": prompt},
+                                    {
+                                        "type": "image_url",
+                                        "image_url": {"url": f"data:image/jpeg;base64,{dni_base64}"}
+                                    },
+                                    {
+                                        "type": "image_url",
+                                        "image_url": {"url": f"data:image/jpeg;base64,{selfie_base64}"}
+                                    }
+                                ]
+                            }
+                        ],
+                        max_tokens=100,
+                        temperature=0
+                    )
+                    
+                    result_text = response.choices[0].message.content.strip()
+                    print(f"🤖 GPT respuesta: {result_text}")
+                    
+                    # Parsear respuesta de ChatGPT
+                    try:
+                        # Limpiar respuesta
+                        if '```json' in result_text:
+                            result_text = result_text.split('```json')[1].split('```')[0]
+                        elif '```' in result_text:
+                            result_text = result_text.split('```')[1].split('```')[0]
+                        
+                        gpt_result = json.loads(result_text.strip())
+                        
+                        # Normalizar respuestas
+                        dni_gender_gpt = gpt_result.get('dni', '').lower()
+                        selfie_gender_gpt = gpt_result.get('selfie', '').lower()
+                        
+                        # Convertir a formato estándar
+                        if 'mujer' in dni_gender_gpt or 'woman' in dni_gender_gpt:
+                            dni_gender = 'Woman'
+                        elif 'hombre' in dni_gender_gpt or 'man' in dni_gender_gpt:
+                            dni_gender = 'Man'
+                        
+                        if 'mujer' in selfie_gender_gpt or 'woman' in selfie_gender_gpt:
+                            selfie_gender = 'Woman'
+                        elif 'hombre' in selfie_gender_gpt or 'man' in selfie_gender_gpt:
+                            selfie_gender = 'Man'
+                        
+                        print(f"🤖 ChatGPT - DNI: {dni_gender}, Selfie: {selfie_gender}")
+                        
+                    except Exception as parse_error:
+                        print(f"⚠️ Error parsing ChatGPT response: {parse_error}")
+                        dni_gender = 'Unknown'
+                        selfie_gender = 'Unknown'
+                
+                except Exception as gpt_error:
+                    print(f"⚠️ ChatGPT falló: {gpt_error}")
+                    dni_gender = 'Unknown'
+                    selfie_gender = 'Unknown'
+            
+            print(f"🔍 Género final - DNI: {dni_gender}, Selfie: {selfie_gender}")
+            
+            # Determinar indicador de fraude
+            if dni_gender and selfie_gender and dni_gender != 'Unknown' and selfie_gender != 'Unknown':
+                if dni_gender != selfie_gender:
+                    print(f"🚨 ALERTA CRÍTICA: Géneros diferentes - DNI: {dni_gender}, Selfie: {selfie_gender}")
+                    gender_fraud_indicator = f"FRAUDE POTENCIAL: Géneros diferentes - DNI({dni_gender}) vs Selfie({selfie_gender})"
+                else:
+                    print(f"✅ Géneros coinciden: {dni_gender}")
+                    gender_fraud_indicator = None
+            else:
+                print(f"⚠️ No se pudo determinar género correctamente")
+                gender_fraud_indicator = None  # No penalizar si no se puede detectar
+                
+        except Exception as e:
+            print(f"⚠️ Error en validación de género: {e}")
+            gender_fraud_indicator = None
+        
+        # 5. DETERMINAR RESULTADO FINAL
+        if is_match and confidence >= 70:
+            user_status = "ACCEPTED"
+            analysis = f"Usuario ACEPTADO: {confidence:.1f}% de confianza con face_recognition."
+            final_face_match = True
+        elif is_match and confidence >= 50:
+            user_status = "REVIEW"
+            analysis = f"Usuario en REVISIÓN: {confidence:.1f}% de confianza. Revisión manual requerida."
+            final_face_match = True
+        else:
+            user_status = "REJECT" 
+            analysis = f"Usuario RECHAZADO: {confidence:.1f}% de confianza. Confianza insuficiente."
+            final_face_match = False
+        
+        print(f"🎯 ESTADO DEL USUARIO: {user_status} - {analysis}")
+        
+        # 6. INDICADORES DE FRAUDE FINALES (simplificados)
+        fraud_indicators = []
+        if gender_fraud_indicator:
+            fraud_indicators.append(gender_fraud_indicator)
+        
+        result = {
+                "confidence": 0,
+                "analysis": "Error al validar las caras detectadas.",
+                "fraud_indicators": ["Error validación caras"],
+                "recommendation": "REJECT"
+            }
+        
+        # SOLO MODELOS FACIALES ESPECIALIZADOS 
         models = ['VGG-Face', 'ArcFace', 'Facenet']
         verification_results = []
         
@@ -949,26 +1148,28 @@ def compare_faces_with_face_recognition(image1_path, image2_path):
         
         for model in models:
             try:
-                print(f"🧠 Verificando con modelo {model}...")
+                # Procesamiento para modelos DeepFace especializados en rostros
+                print(f"🧠 Verificando con modelo facial {model}...")
                 
-                # THRESHOLDS AJUSTADOS PARA DNI vs SELFIE (más permisivos)
+                # THRESHOLDS REALISTAS PARA KYC
                 custom_thresholds = {
-                    'VGG-Face': 1.0,    # Default: 0.68, Ajustado: 1.0
-                    'ArcFace': 1.0,     # Default: 0.68, Ajustado: 1.0  
-                    'Facenet': 0.6      # Default: 0.40, Ajustado: 0.6
+                    'VGG-Face': 0.72,   # LIGERAMENTE PERMISIVO: 0.72 vs 0.68 default
+                    'ArcFace': 0.72,    # LIGERAMENTE PERMISIVO: 0.72 vs 0.68 default
+                    'Facenet': 0.50     # UN POQUITO MÁS PERMISIVO: 0.50 vs 0.40 default (funciona de lujo!)
                 }
                 
-                # Usar el mejor detector encontrado para cada imagen
+                # ESTRATEGIA MEJORADA: Optimizar parámetros sin cambiar thresholds
                 result = DeepFace.verify(
-                    img1_path=image1_path,
+                    img1_path=dni_path_for_comparison,
                     img2_path=image2_path,
                     model_name=model,
-                    detector_backend=dni_detection['detector'],  # Usar mejor detector
-                    distance_metric='cosine',
+                    detector_backend=dni_detection['detector'],
+                    distance_metric='cosine',  # REVERTIR: Volver a cosine
                     enforce_detection=False,
                     align=True,
-                    expand_percentage=10,
-                    threshold=custom_thresholds.get(model, 0.68)  # Usar threshold personalizado
+                    expand_percentage=15,  # CAMBIO: Más contexto facial (15% vs 10%)
+                    threshold=custom_thresholds.get(model, 0.68)
+                    # normalization='base'  # DESACTIVADO: Puede causar problemas
                 )
                 
                 # Calcular confianza personalizada
@@ -986,7 +1187,7 @@ def compare_faces_with_face_recognition(image1_path, image2_path):
                 if confidence_score > highest_confidence:
                     highest_confidence = confidence_score
                     best_result = result
-                    
+                
                 print(f"✅ Modelo {model}: Match={result['verified']}, Distancia={result['distance']:.4f}, Threshold={result['threshold']:.4f}, Confianza={confidence_score:.1f}%")
                 
                 # DEBUG: Mostrar detalles de por qué falla o pasa
@@ -997,7 +1198,24 @@ def compare_faces_with_face_recognition(image1_path, image2_path):
                     print(f"   📊 Diferencia: {(result['distance'] - result['threshold']):.4f}")
                 
             except Exception as e:
+                error_msg = str(e).lower()
                 print(f"⚠️ Modelo {model} falló: {str(e)}")
+                
+                # Detectar errores específicos de falta de caras
+                if any(keyword in error_msg for keyword in ['no face', 'face not found', 'face could not be detected', 'no face detected']):
+                    # Es un error de detección facial - indicar que no hay caras
+                    return {
+                        "face_match": False,
+                        "confidence": 0,
+                        "analysis": f"No se pudo detectar cara en una o ambas imágenes con el modelo {model}. Asegúrese de que su rostro esté claramente visible.",
+                        "quality_check": {
+                            "dni_quality": quality_dni,
+                            "selfie_quality": quality_selfie
+                        },
+                        "fraud_indicators": [f"Sin cara detectable - {model}"],
+                        "recommendation": "REJECT"
+                    }
+                
                 continue
         
         if not verification_results:
@@ -1013,56 +1231,51 @@ def compare_faces_with_face_recognition(image1_path, image2_path):
                 "recommendation": "REJECT"
             }
         
-        # 5. ANÁLISIS CONSENSO (mayoría de modelos)
+        # 5. ANÁLISIS COMBINADO: PROMEDIO + CONSENSO MÍNIMO
+        avg_confidence = sum(r['confidence'] for r in verification_results) / len(verification_results)
         verified_count = sum(1 for r in verification_results if r['verified'])
         total_models = len(verification_results)
-        consensus_match = verified_count > (total_models / 2)
         
-        print(f"📊 ANÁLISIS CONSENSO:")
+        print(f"📊 ANÁLISIS COMBINADO:")
+        print(f"   Promedio de confianza: {avg_confidence:.1f}%")
         print(f"   Modelos que confirman: {verified_count}/{total_models}")
-        print(f"   Consenso: {consensus_match}")
         
-        # 6. CÁLCULO DE CONFIANZA FINAL
-        avg_confidence = sum(r['confidence'] for r in verification_results) / len(verification_results)
-        final_confidence = max(highest_confidence, avg_confidence)
+        # 6. ESTADO DEL USUARIO BASADO EN PROMEDIO + CONSENSO MÍNIMO
+        if avg_confidence >= 60 and verified_count >= 2:
+            user_status = "ACCEPTED"
+            analysis = f"Usuario ACEPTADO: {avg_confidence:.1f}% de confianza promedio con {verified_count} modelos confirmando."
+            final_face_match = True
+        elif avg_confidence >= 40:
+            user_status = "REVIEW"
+            analysis = f"Usuario en REVISIÓN: {avg_confidence:.1f}% de confianza promedio. {verified_count} modelos confirman. Revisión manual requerida."
+            final_face_match = True
+        else:
+            user_status = "CANCEL"
+            analysis = f"Usuario CANCELADO: {avg_confidence:.1f}% de confianza promedio. Confianza insuficiente para continuar."
+            final_face_match = False
         
-        print(f"📊 CONFIANZA FINAL:")
-        print(f"   Promedio: {avg_confidence:.1f}%")
-        print(f"   Máxima: {highest_confidence:.1f}%")
-        print(f"   Final: {final_confidence:.1f}%")
+        print(f"🎯 ESTADO DEL USUARIO: {user_status} - {analysis}")
         
-        # 7. ANÁLISIS DE CALIDAD Y DETECCIÓN
-        detection_analysis = analyze_detection_quality(dni_detection, selfie_detection, quality_dni, quality_selfie)
-        
-        # 8. DETERMINAR RECOMENDACIÓN FINAL
-        recommendation, analysis = determine_enhanced_recommendation(
-            consensus_match, final_confidence, verification_results, 
-            quality_dni, quality_selfie, detection_analysis
-        )
-        
-        print(f"🎯 DECISIÓN FINAL: {recommendation} - {analysis}")
-        
-        # 9. INDICADORES DE FRAUDE
-        fraud_indicators = generate_fraud_indicators(
-            verification_results, quality_dni, quality_selfie, detection_analysis
-        )
+        # 7. INDICADORES DE FRAUDE FINALES (simplificados)
+        fraud_indicators = []
+        if gender_fraud_indicator:
+            fraud_indicators.append(gender_fraud_indicator)
         
         result = {
-            "face_match": consensus_match,
-            "confidence": round(final_confidence, 1),
+            "face_match": final_face_match,
+            "confidence": round(avg_confidence, 1),
             "analysis": analysis,
             "quality_check": {
                 "dni_quality": quality_dni,
-                "selfie_quality": quality_selfie,
-                "detection_analysis": detection_analysis
+                "selfie_quality": quality_selfie
             },
             "fraud_indicators": fraud_indicators,
-            "recommendation": recommendation,
+            "user_status": user_status,  # NUEVO: Estado del usuario
+            "recommendation": user_status,  # Mantener compatibilidad
             "technical_details": {
                 "models_used": len(verification_results),
                 "verified_count": verified_count,
-                "best_model_confidence": highest_confidence,
-                "consensus_confidence": avg_confidence,
+                "average_confidence": round(avg_confidence, 1),
                 "verification_results": verification_results,
                 "detectors_used": {
                     "dni": dni_detection['detector'],
@@ -1072,10 +1285,10 @@ def compare_faces_with_face_recognition(image1_path, image2_path):
         }
         
         print(f"🎯 RESULTADO FINAL:")
-        print(f"   Match: {consensus_match}")
-        print(f"   Confianza: {final_confidence:.1f}%")
-        print(f"   Recomendación: {recommendation}")
-        print(f"   Modelos verificados: {verified_count}/{total_models}")
+        print(f"   Match: {final_face_match}")
+        print(f"   Confianza promedio: {avg_confidence:.1f}%")
+        print(f"   Estado del usuario: {user_status}")
+        print(f"   Modelos que confirman: {verified_count}/{total_models}")
         
         return result
         
@@ -1096,165 +1309,48 @@ def compare_faces_with_face_recognition(image1_path, image2_path):
 
 def analyze_image_quality_enhanced(image_path):
     """
-    📊 Análisis avanzado de calidad de imagen con métricas específicas para KYC
+    📊 Análisis de calidad de imagen mejorado con múltiples métricas
     """
     try:
-        # Cargar imagen
-        image = cv2.imread(image_path)
-        if image is None:
-            return {
-                "overall_score": 0,
-                "sharpness_score": 0,
-                "brightness_score": 0,
-                "contrast_score": 0,
-                "resolution_score": 0,
-                "issues": ["No se pudo cargar la imagen"]
-            }
+        img = cv2.imread(image_path)
+        if img is None:
+            return {"overall_score": 0, "blur": 0, "brightness": 0, "contrast": 0, "sharpness": 0}
         
-        height, width = image.shape[:2]
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         
-        # 1. ANÁLISIS DE NITIDEZ (Laplacian + Gradientes)
-        laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
-        sobel_x = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
-        sobel_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
-        sobel_magnitude = np.sqrt(sobel_x**2 + sobel_y**2)
-        edge_density = np.mean(sobel_magnitude)
+        # Blur detection (Laplacian variance)
+        blur_score = cv2.Laplacian(gray, cv2.CV_64F).var()
+        blur_normalized = min(100, max(0, (blur_score / 500) * 100))
         
-        # 2. ANÁLISIS DE ILUMINACIÓN
+        # Brightness
         brightness = np.mean(gray)
-        brightness_std = np.std(gray)
+        brightness_normalized = min(100, max(0, (brightness / 255) * 100))
         
-        # 3. ANÁLISIS DE CONTRASTE
-        contrast = gray.std()
-        hist = cv2.calcHist([gray], [0], None, [256], [0, 256])
-        hist_spread = np.sum(hist > 0)  # Distribución de intensidades
+        # Contrast (standard deviation)
+        contrast = np.std(gray)
+        contrast_normalized = min(100, max(0, (contrast / 128) * 100))
         
-        # 4. RESOLUCIÓN Y TAMAÑO
-        total_pixels = width * height
-        resolution_score = min(100, total_pixels / 10000)  # Base 100x100
+        # Sharpness (gradient magnitude)
+        sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
+        sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
+        sharpness = np.mean(np.sqrt(sobelx**2 + sobely**2))
+        sharpness_normalized = min(100, max(0, (sharpness / 100) * 100))
         
-        # 5. DETECCIÓN DE BLUR/MOVIMIENTO
-        blur_detection = detect_motion_blur(gray)
-        
-        # SCORING INTELIGENTE
-        # Nitidez (40% del score)
-        if laplacian_var > 500:
-            sharpness_score = 100
-        elif laplacian_var > 100:
-            sharpness_score = 60 + (laplacian_var - 100) / 10
-        else:
-            sharpness_score = max(0, laplacian_var / 5)
-        
-        # Iluminación (30% del score)
-        optimal_brightness = 128
-        brightness_deviation = abs(brightness - optimal_brightness)
-        brightness_score = max(0, 100 - brightness_deviation * 0.8)
-        
-        # Contraste (20% del score)
-        if contrast > 50:
-            contrast_score = 100
-        elif contrast > 20:
-            contrast_score = 40 + (contrast - 20) * 2
-        else:
-            contrast_score = max(0, contrast * 2)
-        
-        # Resolución (10% del score)
-        if total_pixels > 40000:  # 200x200
-            resolution_score = 100
-        else:
-            resolution_score = (total_pixels / 40000) * 100
-        
-        # SCORE FINAL
-        overall_score = (
-            sharpness_score * 0.4 +
-            brightness_score * 0.3 +
-            contrast_score * 0.2 +
-            resolution_score * 0.1
-        )
-        
-        # Penalización por blur
-        if blur_detection['is_blurry']:
-            overall_score *= 0.7
-        
-        # IDENTIFICAR PROBLEMAS
-        issues = []
-        if sharpness_score < 40:
-            issues.append("Imagen desenfocada o borrosa")
-        if brightness_score < 50:
-            if brightness < 50:
-                issues.append("Imagen demasiado oscura")
-            else:
-                issues.append("Imagen sobreexpuesta")
-        if contrast_score < 30:
-            issues.append("Contraste insuficiente")
-        if resolution_score < 50:
-            issues.append("Resolución muy baja")
-        if blur_detection['is_blurry']:
-            issues.append("Detectado blur de movimiento")
+        # Overall score (weighted average)
+        overall_score = (blur_normalized * 0.3 + brightness_normalized * 0.2 + 
+                        contrast_normalized * 0.2 + sharpness_normalized * 0.3)
         
         return {
-            "overall_score": max(0, min(100, int(overall_score))),
-            "sharpness_score": int(sharpness_score),
-            "brightness_score": int(brightness_score),
-            "contrast_score": int(contrast_score),
-            "resolution_score": int(resolution_score),
-            "technical_metrics": {
-                "laplacian_variance": round(laplacian_var, 2),
-                "brightness_mean": round(brightness, 2),
-                "contrast_std": round(contrast, 2),
-                "edge_density": round(edge_density, 2),
-                "resolution": f"{width}x{height}",
-                "blur_score": blur_detection['blur_score']
-            },
-            "issues": issues
+            "overall_score": round(overall_score),
+            "blur": round(blur_normalized),
+            "brightness": round(brightness_normalized),
+            "contrast": round(contrast_normalized),
+            "sharpness": round(sharpness_normalized)
         }
         
     except Exception as e:
-        print(f"❌ Error en análisis de calidad: {str(e)}")
-        return {
-            "overall_score": 0,
-            "issues": [f"Error técnico: {str(e)}"]
-        }
-
-
-def detect_motion_blur(gray_image):
-    """
-    🌀 Detectar blur de movimiento usando análisis de frecuencia
-    """
-    try:
-        # FFT para análisis de frecuencia
-        f_transform = np.fft.fft2(gray_image)
-        f_shift = np.fft.fftshift(f_transform)
-        magnitude = np.abs(f_shift)
-        
-        # Calcular energía en altas frecuencias
-        rows, cols = gray_image.shape
-        crow, ccol = rows//2, cols//2
-        
-        # Crear máscara para altas frecuencias
-        mask = np.zeros((rows, cols), np.uint8)
-        r = 30
-        mask[crow-r:crow+r, ccol-r:ccol+r] = 1
-        
-        # Energía en bajas vs altas frecuencias
-        low_freq_energy = np.sum(magnitude * mask)
-        high_freq_energy = np.sum(magnitude * (1 - mask))
-        
-        # Ratio para determinar blur
-        blur_ratio = low_freq_energy / (high_freq_energy + 1e-6)
-        blur_score = min(100, blur_ratio / 10)
-        
-        is_blurry = blur_score > 15  # Threshold empírico
-        
-        return {
-            "is_blurry": is_blurry,
-            "blur_score": round(blur_score, 2),
-            "blur_ratio": round(blur_ratio, 2)
-        }
-        
-    except Exception:
-        return {"is_blurry": False, "blur_score": 0, "blur_ratio": 0}
+        print(f"Error en análisis de calidad: {e}")
+        return {"overall_score": 0, "blur": 0, "brightness": 0, "contrast": 0, "sharpness": 0}
 
 
 def calculate_deepface_confidence(deepface_result, quality_dni, quality_selfie):
@@ -1299,101 +1395,6 @@ def calculate_deepface_confidence(deepface_result, quality_dni, quality_selfie):
         return 0
 
 
-def analyze_detection_quality(dni_detection, selfie_detection, quality_dni, quality_selfie):
-    """
-    🔍 Analizar calidad de la detección facial
-    """
-    analysis = {
-        "dni_detector_used": dni_detection['detector'] if dni_detection else None,
-        "selfie_detector_used": selfie_detection['detector'] if selfie_detection else None,
-        "dni_faces_count": len(dni_detection['faces']) if dni_detection else 0,
-        "selfie_faces_count": len(selfie_detection['faces']) if selfie_detection else 0,
-        "detection_confidence": "high"
-    }
-    
-    # Evaluar confianza de detección
-    if dni_detection and dni_detection['detector'] in ['opencv', 'mediapipe']:
-        analysis["detection_confidence"] = "medium"
-    if quality_dni['overall_score'] < 40 or quality_selfie['overall_score'] < 50:
-        analysis["detection_confidence"] = "low"
-    
-    return analysis
-
-
-def determine_enhanced_recommendation(consensus_match, confidence, verification_results, 
-                                    quality_dni, quality_selfie, detection_analysis):
-    """
-    🎯 Determinar recomendación final basada en múltiples factores
-    """
-    # LÓGICA DE DECISIÓN INTELIGENTE - MUY PERMISIVA PARA CASOS OBVIOS
-    
-    # APPROVE - Cualquier modelo confirma con confianza decente (NUEVO - MUY PERMISIVO)
-    if any(r['verified'] and r['confidence'] >= 50 for r in verification_results):
-        best_model = max((r for r in verification_results if r['verified']), key=lambda x: x['confidence'], default=None)
-        if best_model:
-            return "APPROVE", f"Verificación exitosa con {best_model['confidence']:.1f}% de confianza usando modelo {best_model['model']}. Coincidencia facial confirmada."
-    
-    # APPROVE - Alta confianza (reducido de 80% a 60%)
-    elif consensus_match and confidence >= 60 and quality_dni['overall_score'] >= 30 and quality_selfie['overall_score'] >= 40:
-        return "APPROVE", f"Verificación exitosa con {confidence:.1f}% de confianza. Las caras coinciden con alta certeza usando múltiples algoritmos de reconocimiento."
-    
-    # APPROVE - Confianza media con buena calidad (reducido de 65% a 45%)
-    elif consensus_match and confidence >= 45 and quality_dni['overall_score'] >= 25 and quality_selfie['overall_score'] >= 50:
-        return "APPROVE", f"Verificación exitosa con {confidence:.1f}% de confianza. Calidad de imágenes aceptable, coincidencia facial confirmada."
-    
-    # REVIEW - Casos límite que requieren revisión manual (reducido de 50% a 30%)
-    elif consensus_match and confidence >= 30:
-        return "REVIEW", f"Posible coincidencia facial ({confidence:.1f}% confianza) pero requiere revisión manual debido a limitaciones en calidad de imagen o algoritmos de detección."
-    
-    elif not consensus_match and confidence >= 25:
-        return "REVIEW", f"Resultado ambiguo ({confidence:.1f}% confianza). Los algoritmos muestran resultados mixtos que requieren verificación manual."
-    
-    elif quality_dni['overall_score'] < 30 and quality_selfie['overall_score'] > 50:
-        return "REVIEW", f"DNI de baja calidad ({quality_dni['overall_score']}/100) impide análisis automático confiable. Selfie de buena calidad. Revisar manualmente."
-    
-    # REJECT - Casos claros de no coincidencia o problemas técnicos
-    else:
-        if not consensus_match and confidence < 35:
-            return "REJECT", f"Las caras no coinciden. Confianza muy baja ({confidence:.1f}%). Los algoritmos indican que son personas diferentes."
-        elif quality_dni['overall_score'] < 20 and quality_selfie['overall_score'] < 30:
-            return "REJECT", f"Calidad de imágenes insuficiente para análisis confiable. DNI: {quality_dni['overall_score']}/100, Selfie: {quality_selfie['overall_score']}/100."
-        else:
-            return "REJECT", f"Verificación fallida. Confianza insuficiente ({confidence:.1f}%) o problemas técnicos detectados."
-
-
-def generate_fraud_indicators(verification_results, quality_dni, quality_selfie, detection_analysis):
-    """
-    🚨 Generar indicadores específicos de posible fraude
-    """
-    indicators = []
-    
-    # Análisis de resultados de modelos
-    verified_count = sum(1 for r in verification_results if r['verified'])
-    total_models = len(verification_results)
-    
-    if verified_count == 0:
-        indicators.append("Ningún modelo de reconocimiento confirma coincidencia")
-    elif verified_count < total_models / 2:
-        indicators.append(f"Solo {verified_count} de {total_models} modelos confirman coincidencia")
-    
-    # Análisis de calidad
-    if quality_dni['overall_score'] < 30:
-        indicators.append("DNI de calidad muy baja - posible manipulación")
-    if quality_selfie['overall_score'] < 40:
-        indicators.append("Selfie de calidad insuficiente")
-    
-    # Análisis de detección
-    if detection_analysis['dni_faces_count'] > 1:
-        indicators.append("Múltiples caras detectadas en DNI")
-    if detection_analysis['selfie_faces_count'] > 1:
-        indicators.append("Múltiples caras detectadas en selfie")
-    
-    # Análisis de distancias
-    high_distances = [r for r in verification_results if r['distance'] > 0.8]
-    if len(high_distances) > len(verification_results) / 2:
-        indicators.append("Alta distancia facial en múltiples modelos")
-    
-    return indicators
 
 
 # =============================================================================
@@ -1784,239 +1785,6 @@ def gpt_vision_compare_faces(image1_path, image2_path, comparison_type="general"
             "recommendation": "REJECT"
         }
 
-def extract_video_frames(video_path, num_frames=3):
-    """
-    🎬 Extrae frames clave de un video para análisis
-    
-    Parámetros:
-    - video_path: Ruta del archivo de video
-    - num_frames: Número de frames a extraer (default: 3)
-    
-    Devuelve:
-    - Lista de rutas de archivos de frames extraídos
-    """
-    try:
-        print(f"🎬 Extrayendo {num_frames} frames de: {video_path}")
-        
-        # Abrir video con OpenCV - intentar múltiples métodos
-        cap = cv2.VideoCapture(video_path)
-        
-        if not cap.isOpened():
-            print(f"⚠️ Método 1 falló, intentando con backend CAP_FFMPEG...")
-            cap = cv2.VideoCapture(video_path, cv2.CAP_FFMPEG)
-            
-        if not cap.isOpened():
-            print(f"⚠️ Método 2 falló, intentando conversión rápida...")
-            # Usar FFmpeg para convertir a formato compatible si está disponible
-            try:
-                import subprocess
-                temp_video = video_path.replace('.webm', '_temp.mp4').replace('.mkv', '_temp.mp4')
-                subprocess.run(['ffmpeg', '-i', video_path, '-c:v', 'libx264', '-y', temp_video], 
-                             capture_output=True, timeout=10)
-                cap = cv2.VideoCapture(temp_video)
-                if cap.isOpened():
-                    video_path = temp_video  # Usar el video convertido
-                    print(f"✅ Video convertido exitosamente: {temp_video}")
-            except:
-                pass
-        
-        if not cap.isOpened():
-            print(f"❌ No se pudo abrir el video con ningún método: {video_path}")
-            return []
-        
-        # Obtener información del video
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        duration = total_frames / fps if fps > 0 else 0
-        
-        print(f"🎬 Video info: {total_frames} frames, {fps:.1f} FPS, {duration:.1f}s")
-        
-        if total_frames < num_frames:
-            print(f"⚠️ Video muy corto, usando todos los frames disponibles: {total_frames}")
-            num_frames = total_frames
-        
-        # Calcular frames a extraer (distribuidos uniformemente)
-        frame_indices = []
-        if num_frames == 1:
-            frame_indices = [total_frames // 2]  # Frame del medio
-        else:
-            step = total_frames // (num_frames + 1)
-            frame_indices = [step * (i + 1) for i in range(num_frames)]
-        
-        print(f"🎬 Extrayendo frames en posiciones: {frame_indices}")
-        
-        # Extraer frames
-        extracted_frames = []
-        base_filename = os.path.splitext(os.path.basename(video_path))[0]
-        
-        for i, frame_index in enumerate(frame_indices):
-            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
-            ret, frame = cap.read()
-            
-            if ret:
-                # Rotar frame (igual que en play.py y faceVideo)
-                frame = imutils.rotate(frame, -90)
-                
-                # Guardar frame como imagen
-                frame_filename = f"{base_filename}_frame_{i+1}_{frame_index}.jpg"
-                frame_path = os.path.join(UPLOAD_FOLDER, frame_filename)
-                
-                cv2.imwrite(frame_path, frame)
-                extracted_frames.append(frame_path)
-                print(f"🎬 Frame {i+1} guardado: {frame_path}")
-            else:
-                print(f"⚠️ No se pudo extraer frame en posición {frame_index}")
-        
-        cap.release()
-        
-        print(f"✅ Extraídos {len(extracted_frames)} frames de {num_frames} solicitados")
-        return extracted_frames
-        
-    except Exception as e:
-        print(f"❌ Error extrayendo frames: {e}")
-        return []
-
-def gpt_vision_analyze_video_frames(video_path, reference_image_path):
-    """
-    🎥 GPT Vision analiza frames de video para verificación de vida
-    
-    Parámetros:
-    - video_path: Ruta del video de verificación
-    - reference_image_path: Imagen de referencia (selfie o DNI)
-    
-    Devuelve:
-    {
-        "is_live_person": true/false,
-        "matches_reference": true/false,
-        "confidence": 0-100,
-        "liveness_score": 0-100,
-        "analysis": "análisis detallado",
-        "recommendation": "APPROVE/REVIEW/REJECT"
-    }
-    """
-    try:
-        print(f"🎥 GPT Vision analizando video: {video_path}")
-        
-        # 1. Extraer frames clave del video
-        video_frames = extract_video_frames(video_path, num_frames=3)
-        
-        if not video_frames:
-            print("⚠️ No se pudieron extraer frames, verificando si video es válido...")
-            
-            # Fallback: verificar si el video al menos existe y tiene tamaño razonable
-            try:
-                video_size = os.path.getsize(video_path)
-                print(f"📁 Tamaño del video: {video_size} bytes")
-                
-                if video_size > 50000:  # Al menos 50KB
-                    print("✅ Video parece válido por tamaño, usando verificación permisiva")
-                    return {
-                        "is_live_person": True,   # Asumir válido
-                        "matches_reference": True,
-                        "confidence": 65,         # Confianza media
-                        "liveness_score": 70,     # Score razonable
-                        "analysis": "Video válido detectado. No se pudieron extraer frames para análisis detallado, pero el archivo parece legítimo.",
-                        "recommendation": "REVIEW",
-                        "frames_analyzed": 0,
-                        "consistency_scores": [],
-                        "fallback_used": True
-                    }
-                else:
-                    print("❌ Video muy pequeño, probablemente corrupto")
-            except Exception as e:
-                print(f"❌ Error verificando video: {e}")
-            
-            return {
-                "is_live_person": False,
-                "matches_reference": False,
-                "confidence": 0,
-                "liveness_score": 0,
-                "analysis": "No se pudieron extraer frames del video y archivo parece inválido",
-                "recommendation": "REJECT"
-            }
-        
-        # 2. Analizar el primer frame con GPT Vision para liveness
-        print("🧠 Analizando liveness con GPT Vision...")
-        liveness_result = gpt_vision_compare_faces(
-            reference_image_path,
-            video_frames[0],  # Usar primer frame
-            comparison_type="selfie_vs_video"
-        )
-        
-        # 3. Si hay múltiples frames, analizar consistencia
-        consistency_scores = []
-        if len(video_frames) > 1:
-            print("🧠 Analizando consistencia entre frames...")
-            for i in range(1, len(video_frames)):
-                frame_comparison = gpt_vision_compare_faces(
-                    video_frames[0],
-                    video_frames[i],
-                    comparison_type="general"
-                )
-                consistency_scores.append(frame_comparison.get('confidence', 0))
-        
-        # 4. Calcular puntuaciones finales
-        base_confidence = liveness_result.get('confidence', 0)
-        liveness_score = liveness_result.get('confidence', 0)
-        
-        # Bonus por consistencia entre frames
-        if consistency_scores:
-            avg_consistency = sum(consistency_scores) / len(consistency_scores)
-            print(f"🎥 Consistencia promedio entre frames: {avg_consistency}%")
-            # Ajustar liveness score basado en consistencia
-            if avg_consistency > 80:
-                liveness_score = min(100, liveness_score + 10)  # Bonus por alta consistencia
-            elif avg_consistency < 50:
-                liveness_score = max(0, liveness_score - 20)   # Penalización por baja consistencia
-        
-        # 5. Determinar recomendación final
-        is_live = liveness_result.get('is_live_person', False)
-        matches_ref = liveness_result.get('face_match', False)
-        
-        if liveness_score >= 85 and is_live and matches_ref:
-            recommendation = "APPROVE"
-        elif liveness_score >= 65:
-            recommendation = "REVIEW"
-        else:
-            recommendation = "REJECT"
-        
-        # 6. Compilar análisis detallado
-        analysis_parts = [
-            liveness_result.get('analysis', 'Sin análisis base'),
-            f"Frames analizados: {len(video_frames)}",
-        ]
-        
-        if consistency_scores:
-            analysis_parts.append(f"Consistencia entre frames: {avg_consistency:.1f}%")
-        
-        final_analysis = ". ".join(analysis_parts)
-        
-        result = {
-            "is_live_person": is_live,
-            "matches_reference": matches_ref,
-            "confidence": base_confidence,
-            "liveness_score": liveness_score,
-            "analysis": final_analysis,
-            "recommendation": recommendation,
-            "frames_analyzed": len(video_frames),
-            "consistency_scores": consistency_scores,
-            "gpt_raw_response": liveness_result
-        }
-        
-        print(f"🎥 Análisis completado - Live: {is_live}, Match: {matches_ref}, Score: {liveness_score}%")
-        return result
-        
-    except Exception as e:
-        print(f"❌ Error analizando video: {e}")
-        return {
-            "is_live_person": False,
-            "matches_reference": False,
-            "confidence": 0,
-            "liveness_score": 0,
-            "analysis": f"Error: {str(e)}",
-            "recommendation": "REJECT"
-        }
-
 def analyze_and_compare_dni_with_gpt(image_path, user_data):
     """
     GPT-4 Vision analiza DNI Y compara con datos del usuario
@@ -2029,38 +1797,61 @@ def analyze_and_compare_dni_with_gpt(image_path, user_data):
         
         # Prompt para análisis completo
         prompt = f"""
-        Analiza esta imagen de DNI español y compara con los datos del usuario.
+        Analiza esta imagen de documento de identidad y compara con los datos del usuario.
         
         DATOS DEL USUARIO A VERIFICAR:
         - Nombre: {user_data['firstName']} {user_data['lastName']}
-        - DNI: {user_data['dni']}
+        - Número de documento: {user_data['documentNumber']}
+        - Nacionalidad: {user_data['nationality']}
         - Fecha nacimiento: {user_data['birthDate']}
-        - Dirección: {user_data['address']}
+        - Fecha expedición: {user_data['issueDate']}
+        - Fecha validez: {user_data['expiryDate']}
         
-        TAREAS:
-        1. Extrae TODOS los datos visibles del DNI
-        2. Compara cada campo con los datos del usuario
-        3. Sé tolerante con errores de OCR y variaciones (ej: "LÓPEZ" puede aparecer en "PRIETO LÓPEZ")
-        4. Considera que algunos campos pueden estar incompletos en el DNI
+        TAREAS CRÍTICAS:
+        1. IDENTIFICAR EL TIPO DE DOCUMENTO y verificar que corresponde al país {user_data['nationality']}
+        2. Extrae TODOS los datos visibles del documento
+        3. Compara cada campo con los datos del usuario
+        4. Sé tolerante con errores de OCR y variaciones
+        5. VERIFICAR que el documento es del país correcto (ej: DNI español para ESP, CNI francés para FRA, etc.)
+        
+        PAÍSES Y SUS DOCUMENTOS:
+        - ESP: DNI español
+        - FRA: Carte Nationale d'Identité (CNI)
+        - ITA: Carta d'Identità
+        - PRT: Cartão de Cidadão
+        - DEU: Personalausweis
+        - USA: Driver's License / State ID
+        - MEX: INE
+        - ARG: DNI argentino
+        - COL: Cédula de Ciudadanía
         
         Responde EXACTAMENTE en este formato JSON:
         {{
-            "extracted_text": "texto completo extraído del DNI",
+            "extracted_text": "texto completo extraído del documento",
+            "document_analysis": {{
+                "document_type": "tipo de documento detectado",
+                "country_match": true/false,
+                "is_valid_document": true/false
+            }},
             "verification": {{
                 "name_match": true/false,
-                "dni_match": true/false,
+                "document_number_match": true/false,
                 "birthdate_match": true/false,
-                "address_match": true/false,
+                "issue_date_match": true/false,
+                "expiry_date_match": true/false,
+                "country_verification": true/false,
                 "overall_confidence": 0-100,
-                "recommendation": "APPROVE/REJECT/MANUAL_REVIEW"
+                "recommendation": "APPROVE/REJECT/REVIEW"
             }},
             "extracted_data": {{
                 "name": "nombre extraído",
-                "dni": "dni extraído", 
-                "birthdate": "fecha extraída",
-                "address": "dirección extraída"
+                "document_number": "número extraído", 
+                "birthdate": "fecha nacimiento extraída",
+                "issue_date": "fecha expedición extraída",
+                "expiry_date": "fecha validez extraída",
+                "nationality": "nacionalidad detectada"
             }},
-            "details": "explicación breve de la verificación"
+            "details": "explicación breve de la verificación y país"
         }}
         """
         
@@ -2069,7 +1860,7 @@ def analyze_and_compare_dni_with_gpt(image_path, user_data):
             messages=[
                 {
                     "role": "system",
-                    "content": "Eres un experto en verificación de documentos españoles. Analiza con precisión pero sé tolerante con variaciones normales."
+                    "content": "Eres un experto en verificación de documentos de identidad internacionales. Analiza con precisión y verifica que el documento corresponde al país indicado. Sé tolerante con variaciones normales pero estricto con la correspondencia país-documento."
                 },
                 {
                     "role": "user",
@@ -2145,412 +1936,4 @@ def analyze_and_compare_dni_with_gpt(image_path, user_data):
             "details": "No se pudo conectar con GPT-4 Vision"
         })
 
-def analyze_dni_with_gpt_vision_simple(image_path):
-    """
-    Analiza imagen de DNI usando GPT-4 Vision (modo simple)
-    Solo extrae texto, no compara - SOLO GPT-4
-    """
-    try:
-        # Convertir imagen a base64
-        with open(image_path, "rb") as image_file:
-            base64_image = base64.b64encode(image_file.read()).decode('utf-8')
-        
-        # Prompt optimizado para extraer datos del DNI español
-        prompt = """
-        Analiza esta imagen de DNI español y extrae TODOS los datos visibles.
-        
-        IMPORTANTE:
-        - Extrae el texto EXACTAMENTE como lo ves
-        - Mantén el formato original del documento
-        - Si ves números con símbolos extraños, inclúyelos tal como están
-        - Si algo está borroso, extrae lo que puedas distinguir
-        - Mantén las líneas separadas como aparecen
-        
-        Responde SOLO con el texto extraído tal como aparece en el documento, línea por línea.
-        NO uses formato JSON ni explicaciones, solo el texto plano.
-        """
-        
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}"
-                            }
-                        }
-                    ]
-                }
-            ],
-            max_tokens=500,
-            temperature=0.1
-        )
-        
-        extracted_text = response.choices[0].message.content
-        print(f"🤖 GPT-4 Vision (simple) extracted: {extracted_text[:100]}...")
-        return extracted_text
-        
-    except Exception as e:
-        print(f"❌ GPT-4 Vision Simple Error: {e}")
-        # SIN FALLBACK - Solo error
-        return f"ERROR GPT-4: {str(e)}"
 
-@app.route('/textImage')
-def textImage():
-    try:
-        known = request.args.get('known')
-        
-        # Obtener datos del usuario del HTML
-        user_first_name = request.args.get('firstName', '')
-        user_last_name = request.args.get('lastName', '')
-        user_dni = request.args.get('dni', '')
-        user_birth_date = request.args.get('birthDate', '')
-        user_address = request.args.get('address', '')
-        
-        if not known:
-            return ""
-        
-        # Si no hay datos del usuario, solo extraer texto (modo legacy)
-        if not (user_first_name and user_last_name and user_dni):
-            print(f"🔍 Legacy mode: Only extracting text with GPT-4 Vision from {known}")
-            extracted_text = analyze_dni_with_gpt_vision_simple(known)
-            return extracted_text if extracted_text.strip() else "No se pudo extraer texto de la imagen."
-        
-        # NUEVO: Modo completo - GPT-4 extrae Y compara
-        print(f"🧠 Smart mode: GPT-4 will extract + compare for {user_first_name} {user_last_name}")
-        result = analyze_and_compare_dni_with_gpt(known, {
-            'firstName': user_first_name,
-            'lastName': user_last_name,
-            'dni': user_dni,
-            'birthDate': user_birth_date,
-            'address': user_address
-        })
-        
-        return result
-        
-    except Exception as e:
-        print(f"❌ textImage Error: {e}")
-        return ""
-
-@app.route('/faceImage')
-def faceImage():
-    try:
-        known = request.args.get('known')
-        unknown = request.args.get('unknown')
-
-        if not known or not unknown:
-            return str(False)
-
-        picture_of_me = face_recognition.load_image_file(known)
-        known_face_encodings = face_recognition.face_encodings(picture_of_me)
-        
-        if len(known_face_encodings) == 0:
-            return str(False)
-        
-        my_face_encoding = known_face_encodings[0]
-
-        unknown_picture = face_recognition.load_image_file(unknown)
-        unknown_face_encodings = face_recognition.face_encodings(unknown_picture)
-        
-        if len(unknown_face_encodings) == 0:
-            return str(False)
-            
-        unknown_face_encoding = unknown_face_encodings[0]
-
-        # Compare the faces
-        results = face_recognition.compare_faces([my_face_encoding], unknown_face_encoding)
-
-        return str(results[0])
-        
-    except Exception as e:
-        return str(False)
-
-@app.route('/faceVideo')
-def faceVideo():
-    try:
-        known = request.args.get('known')
-        unknown = request.args.get('unknown')
-
-        if not known or not unknown:
-            return str(False)
-
-        picture_of_me = face_recognition.load_image_file(known)
-        face_encodings_known = face_recognition.face_encodings(picture_of_me)
-        
-        if len(face_encodings_known) == 0:
-            return str(False)
-            
-        known_face_me = face_encodings_known[0]
-
-        # Initialize some variables
-        count = 0
-        found = 0
-        success = True
-
-        vidcap = cv2.VideoCapture(unknown)
-        #play first
-        success, image = vidcap.read()
-
-        while success and count < 100:  # Limit frames to prevent infinite loop
-            try:
-                image = imutils.rotate(image, -90)  # Use same rotation as play.py
-                face_encodings_list = face_recognition.face_encodings(image)
-                
-                if len(face_encodings_list) > 0:
-                    face_encodings = face_encodings_list[0]
-                    matches = face_recognition.compare_faces([known_face_me], face_encodings)
-                    
-                    if True in matches:
-                        found += 1
-                        
-                    if found > 10:
-                        break
-            except Exception as e:
-                # Skip frame if face detection fails
-                pass
-                
-            # Read next frame
-            success, image = vidcap.read()
-            count += 1
-
-        vidcap.release()
-
-        # Avoid division by zero
-        resp = False
-        if count > 0 and (found / count > 0.5):
-            resp = True
-
-        return str(resp)
-        
-    except Exception as e:
-        return str(False)
-
-# =============================================================================
-# 🔍 FUNCIONES AUXILIARES PARA COMPARACIÓN MEJORADA
-# =============================================================================
-
-def analyze_image_quality(image_path):
-    """
-    📊 Analizar calidad de imagen: nitidez, iluminación, resolución
-    """
-    try:
-        import cv2
-        import numpy as np
-        
-        # Cargar imagen
-        image = cv2.imread(image_path)
-        if image is None:
-            return {"score": 0, "issues": ["No se pudo cargar la imagen"]}
-        
-        height, width = image.shape[:2]
-        
-        # 1. ANÁLISIS DE NITIDEZ (Laplacian variance)
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
-        
-        # 2. ANÁLISIS DE ILUMINACIÓN
-        brightness = np.mean(gray)
-        
-        # 3. ANÁLISIS DE CONTRASTE
-        contrast = gray.std()
-        
-        # 4. RESOLUCIÓN
-        resolution_score = min(100, (width * height) / 10000)  # Base 100x100 = score 1
-        
-        # CÁLCULO DE SCORE TOTAL
-        sharpness_score = min(100, laplacian_var / 5)  # Normalizar
-        brightness_score = 100 - abs(brightness - 128) / 1.28  # Óptimo ~128
-        contrast_score = min(100, contrast / 2.55)  # Normalizar
-        
-        total_score = (sharpness_score * 0.4 + brightness_score * 0.3 + 
-                      contrast_score * 0.2 + resolution_score * 0.1)
-        
-        issues = []
-        if laplacian_var < 100:
-            issues.append("Imagen borrosa o desenfocada")
-        if brightness < 50:
-            issues.append("Imagen muy oscura")
-        elif brightness > 200:
-            issues.append("Imagen muy clara/sobreexpuesta")
-        if contrast < 30:
-            issues.append("Bajo contraste")
-        if width < 200 or height < 200:
-            issues.append("Resolución muy baja")
-        
-        return {
-            "score": int(total_score),
-            "sharpness": laplacian_var,
-            "brightness": brightness,
-            "contrast": contrast,
-            "resolution": f"{width}x{height}",
-            "issues": issues
-        }
-        
-    except Exception as e:
-        print(f"❌ Error analizando calidad: {e}")
-        return {"score": 50, "issues": [f"Error analizando calidad: {str(e)}"]}
-
-def validate_face_detection(face_encodings_1, face_locations_1, face_encodings_2, face_locations_2, quality_dni, quality_selfie):
-    """
-    ✅ Validar detección de caras y calidad antes de comparar
-    """
-    # Validar DNI
-    if len(face_encodings_1) == 0:
-        if quality_dni['score'] < 30:
-            return {
-                "valid": False,
-                "result": {
-                    "face_match": False,
-                    "confidence": 0,
-                    "analysis": "No se detectó cara en el DNI debido a la baja calidad de la imagen",
-                    "fraud_indicators": ["DNI de calidad insuficiente", "Sin cara detectable en documento"],
-                    "recommendation": "REJECT"
-                }
-            }
-        else:
-            # DNI de buena calidad pero sin cara detectable - revisar manualmente
-            return {
-                "valid": False,
-                "result": {
-                    "face_match": False,
-                    "confidence": 0,
-                    "analysis": "DNI de buena calidad pero no se puede detectar la cara automáticamente",
-                    "fraud_indicators": ["Cara no detectable en documento de buena calidad"],
-                    "recommendation": "REVIEW"
-                }
-            }
-    
-    # Validar Selfie
-    if len(face_encodings_2) == 0:
-        return {
-            "valid": False,
-            "result": {
-                "face_match": False,
-                "confidence": 0,
-                "analysis": "No se detectó ninguna cara en el selfie",
-                "fraud_indicators": ["Sin cara visible en selfie"],
-                "recommendation": "REJECT"
-            }
-        }
-    
-    # Validar múltiples caras en selfie
-    if len(face_encodings_2) > 1:
-        return {
-            "valid": False,
-            "result": {
-                "face_match": False,
-                "confidence": 0,
-                "analysis": f"Se detectaron {len(face_encodings_2)} caras en el selfie. Solo debe aparecer una persona",
-                "fraud_indicators": ["Múltiples caras detectadas en selfie"],
-                "recommendation": "REJECT"
-            }
-        }
-    
-    return {"valid": True}
-
-def analyze_face_position(face_loc_1, face_loc_2, img1_shape, img2_shape):
-    """
-    📐 Analizar posición y tamaño de las caras
-    """
-    import numpy as np
-    
-    # Extraer coordenadas (top, right, bottom, left)
-    top1, right1, bottom1, left1 = face_loc_1
-    top2, right2, bottom2, left2 = face_loc_2
-    
-    # Calcular centros y tamaños
-    center1_x = (left1 + right1) / 2
-    center1_y = (top1 + bottom1) / 2
-    size1 = (right1 - left1) * (bottom1 - top1)
-    
-    center2_x = (left2 + right2) / 2
-    center2_y = (top2 + bottom2) / 2
-    size2 = (right2 - left2) * (bottom2 - top2)
-    
-    # Analizar centrado (respecto al centro de la imagen)
-    img1_center_x, img1_center_y = img1_shape[1] / 2, img1_shape[0] / 2
-    img2_center_x, img2_center_y = img2_shape[1] / 2, img2_shape[0] / 2
-    
-    # Distancia del centro de la cara al centro de la imagen (normalizada)
-    dist1 = np.sqrt((center1_x - img1_center_x)**2 + (center1_y - img1_center_y)**2) / min(img1_shape[:2])
-    dist2 = np.sqrt((center2_x - img2_center_x)**2 + (center2_y - img2_center_y)**2) / min(img2_shape[:2])
-    
-    # Tamaño relativo de la cara respecto a la imagen
-    size1_ratio = size1 / (img1_shape[0] * img1_shape[1])
-    size2_ratio = size2 / (img2_shape[0] * img2_shape[1])
-    
-    return {
-        "face_centered": dist2 < 0.3,  # Cara centrada en selfie
-        "face_size_ok": 0.05 < size2_ratio < 0.4,  # Tamaño apropiado
-        "face_position_score": max(0, 100 - int(dist2 * 100)),
-        "face_size_score": 100 if 0.1 < size2_ratio < 0.3 else max(0, 100 - abs(size2_ratio - 0.2) * 500),
-        "dni_face_ratio": size1_ratio,
-        "selfie_face_ratio": size2_ratio
-    }
-
-def calculate_advanced_confidence(face_distance, quality_dni, quality_selfie, position_analysis):
-    """
-    🧮 Calcular confianza usando múltiples factores
-    """
-    # Base: Similitud facial (60% del peso)
-    base_confidence = max(0, int((1 - face_distance) * 100))
-    
-    # Ajustes por calidad (25% del peso)
-    quality_factor = (quality_dni['score'] + quality_selfie['score']) / 200
-    quality_bonus = quality_factor * 25
-    
-    # Ajustes por posición (15% del peso)
-    position_bonus = (position_analysis['face_position_score'] + position_analysis['face_size_score']) / 200 * 15
-    
-    # Confianza final
-    final_confidence = int(base_confidence * 0.6 + quality_bonus + position_bonus)
-    
-    return min(100, max(0, final_confidence))
-
-def determine_final_recommendation(face_match, confidence, face_distance, quality_dni, quality_selfie, position_analysis):
-    """
-    🎯 Determinar recomendación final basada en múltiples factores
-    """
-    # Factores de decisión
-    high_quality = quality_dni['score'] > 60 and quality_selfie['score'] > 60
-    good_position = position_analysis['face_centered'] and position_analysis['face_size_ok']
-    strong_match = face_match and confidence >= 70
-    weak_match = face_match and confidence >= 50
-    
-    # Lógica de decisión
-    if strong_match and high_quality and good_position:
-        recommendation = "APPROVE"
-        analysis = f"Verificación exitosa: Alta similitud ({confidence}%), buena calidad de imágenes y posicionamiento correcto"
-    
-    elif weak_match and (high_quality or good_position):
-        recommendation = "REVIEW"
-        analysis = f"Similitud moderada ({confidence}%). Requiere revisión manual debido a calidad o posicionamiento"
-    
-    elif face_match and confidence >= 40:
-        recommendation = "REVIEW"
-        analysis = f"Similitud baja-media ({confidence}%). Imágenes de calidad limitada - revisión manual recomendada"
-    
-    else:
-        recommendation = "REJECT"
-        analysis = f"No se pudo verificar identidad: Baja similitud ({confidence}%) o calidad insuficiente"
-    
-    # Agregar detalles específicos
-    if not position_analysis['face_centered']:
-        analysis += ". Cara no centrada en selfie"
-    if quality_selfie['score'] < 40:
-        analysis += ". Selfie borroso o de mala calidad"
-    if quality_dni['score'] < 30:
-        analysis += ". Documento de baja calidad"
-    
-    return recommendation, analysis
-
-# If we're running in stand alone mode, run the application
-if __name__ == '__main__':
-    # Configuración para producción y desarrollo
-    port = int(os.environ.get('PORT', 5000))
-    debug = os.environ.get('FLASK_ENV', 'development') == 'development'
-    app.run(host='127.0.0.1', port=port, debug=debug)
