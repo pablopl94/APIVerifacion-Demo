@@ -1,57 +1,24 @@
 """
-🚀 SERVIDOR PRINCIPAL KYC API
-API completa para verificación KYC con frontend/backend separation
+🔧 UTILIDADES COMPARTIDAS KYC
+Funciones que usan los controladores
 """
-from flask import Flask, request, render_template, jsonify, send_from_directory
 import os
 import uuid
-from werkzeug.utils import secure_filename
 import base64
 import json
 from openai import OpenAI
 from dotenv import load_dotenv
-import warnings
-warnings.filterwarnings('ignore')
-
-# Importar blueprints de la arquitectura existente
-from app.controllers.base_controller import base_bp
-from app.controllers.kyc_controller import kyc_bp
-from app.controllers.upload_controller import upload_bp
-from app.database.connection import create_tables, test_connection
 
 # Cargar variables de entorno
 load_dotenv(override=True)
 
 # Configurar OpenAI
 api_key = os.getenv('OPENAI_API_KEY')
-if not api_key:
-    print("⚠️ OPENAI_API_KEY no encontrada en .env")
-    print("💡 Crea un archivo .env con: OPENAI_API_KEY=tu_api_key")
-else:
-    print(f"🔑 API Key cargada: {api_key[:15]}...{api_key[-4:]}")
-
 client = OpenAI(api_key=api_key) if api_key else None
 
-# Crear aplicación Flask
-app = Flask(__name__, 
-           template_folder="templates",
-           static_folder="static",
-           static_url_path="/static")
-
-# Configuración
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-key-change-in-production')
-
-# Importar utilidades compartidas
-from app.utils import UPLOAD_FOLDER, ALLOWED_EXTENSIONS
-
-# Crear carpeta de uploads
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
-# =============================================================================
-# 🔧 FUNCIONES UTILITARIAS (que usan los controladores)
-# =============================================================================
+# Configuración de archivos
+UPLOAD_FOLDER = 'uploads'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'mp4', 'avi', 'mov', 'mkv', 'webm'}
 
 def allowed_file(filename):
     """✅ Validar tipo de archivo permitido"""
@@ -60,7 +27,6 @@ def allowed_file(filename):
 def analyze_and_compare_dni_with_gpt(image_path, user_data):
     """
     🧠 GPT-4 Vision: Análisis y comparación de DNI
-    Función que faltaba en el sistema - ahora implementada
     """
     if not client:
         return json.dumps({
@@ -253,7 +219,6 @@ def analyze_and_compare_dni_with_gpt(image_path, user_data):
 def compare_faces_with_face_recognition(dni_path, selfie_path):
     """
     🤳 Delegación a SelfieVerificationService
-    Los controladores usan esta función, pero delega al servicio real
     """
     try:
         from app.services.selfie_verification_service import SelfieVerificationService
@@ -272,7 +237,6 @@ def compare_faces_with_face_recognition(dni_path, selfie_path):
 def analyze_video_liveness_with_deepface(video_path, reference_path):
     """
     🎥 Delegación a VideoVerificationService  
-    Los controladores usan esta función, pero delega al servicio real
     """
     try:
         from app.services.video_verification_service import VideoVerificationService
@@ -287,144 +251,3 @@ def analyze_video_liveness_with_deepface(video_path, reference_path):
             "frames_analyzed": 0,
             "technical_details": {"error": str(e)}
         }
-
-# =============================================================================
-# 📡 REGISTRAR BLUEPRINTS (CONTROLADORES)
-# =============================================================================
-
-# Registrar todos los controladores existentes
-app.register_blueprint(base_bp)           # Rutas: /, /test
-app.register_blueprint(kyc_bp)            # Rutas: /kyc/*
-app.register_blueprint(upload_bp)         # Rutas: /upload, /uploads/<file>
-
-# =============================================================================
-# 🏥 ENDPOINTS DE SALUD Y ESTADO
-# =============================================================================
-
-@app.route('/health')
-def health_check():
-    """🏥 Endpoint de salud para verificar que todo funciona"""
-    try:
-        # Verificar conexión a BD
-        db_status = test_connection()
-        
-        # Verificar configuración OpenAI
-        openai_status = client is not None
-        
-        # Verificar carpeta uploads
-        uploads_status = os.path.exists(UPLOAD_FOLDER)
-        
-        health_data = {
-            "status": "healthy" if all([db_status, openai_status, uploads_status]) else "unhealthy",
-            "timestamp": "2025-09-03T00:00:00Z",
-            "checks": {
-                "database": "connected" if db_status else "disconnected",
-                "openai": "configured" if openai_status else "not_configured", 
-                "uploads": "ready" if uploads_status else "not_ready"
-            },
-            "version": "2.0.0",
-            "endpoints": {
-                "dni_validation": "/kyc/validate-dni",
-                "selfie_verification": "/kyc/verify-selfie", 
-                "liveness_verification": "/kyc/verify-liveness",
-                "user_status": "/kyc/user-status/<document>",
-                "complete_verification": "/kyc/complete-verification/<document>"
-            }
-        }
-        
-        return jsonify(health_data), 200 if health_data["status"] == "healthy" else 503
-        
-    except Exception as e:
-        return jsonify({
-            "status": "error",
-            "error": str(e),
-            "timestamp": "2025-09-03T00:00:00Z"
-        }), 500
-
-@app.route('/api/info')
-def api_info():
-    """📋 Información completa de la API"""
-    return jsonify({
-        "name": "KYC Verification API",
-        "version": "2.0.0",
-        "description": "API completa para verificación KYC con DNI, Selfie y Video Liveness",
-        "architecture": "Flask + SQLAlchemy + GPT-4 Vision + DeepFace",
-        "capabilities": [
-            "DNI OCR con GPT-4 Vision",
-            "Verificación facial con DeepFace", 
-            "Análisis de video liveness",
-            "Base de datos MySQL persistente",
-            "Flujo completo KYC automatizado"
-        ],
-        "endpoints": {
-            "POST /kyc/validate-dni": "Paso 1: Validar datos vs DNI",
-            "POST /kyc/verify-selfie": "Paso 2: Verificar selfie vs DNI",
-            "POST /kyc/verify-liveness": "Paso 3: Verificar video liveness",
-            "GET /kyc/user-status/<doc>": "Consultar estado usuario",
-            "GET /kyc/complete-verification/<doc>": "Resumen completo"
-        },
-        "frontend_integration": {
-            "test_interface": "/test",
-            "upload_files": "POST /upload",
-            "serve_files": "GET /uploads/<filename>"
-        }
-    })
-
-# =============================================================================
-# 🚀 INICIALIZACIÓN
-# =============================================================================
-
-def initialize_app():
-    """🚀 Inicializar aplicación completa"""
-    print("🏗️ Inicializando sistema KYC...")
-    
-    # 1. Verificar base de datos
-    print("🗄️ Verificando base de datos...")
-    if test_connection():
-        print("✅ Conexión a MySQL exitosa")
-        create_tables()
-        print("✅ Tablas verificadas/creadas")
-    else:
-        print("⚠️ Problema con base de datos - API funcionará en modo limitado")
-    
-    # 2. Verificar OpenAI
-    if client:
-        print("✅ OpenAI GPT-4 Vision configurado")
-    else:
-        print("⚠️ OpenAI no configurado - crear archivo .env con OPENAI_API_KEY")
-    
-    # 3. Verificar carpetas
-    print(f"📁 Carpeta uploads: {UPLOAD_FOLDER}")
-    
-    print("✅ Inicialización completa")
-
-if __name__ == '__main__':
-    initialize_app()
-    
-    print("\n🚀 SERVIDOR KYC API INICIADO")
-    print("="*50)
-    print("📍 ENDPOINTS PRINCIPALES:")
-    print("   🏠 GET  /                     - Estado de la API")
-    print("   🧪 GET  /test                 - Interfaz de pruebas")
-    print("   🏥 GET  /health               - Health check")
-    print("   📋 GET  /api/info             - Info de la API")
-    print("")
-    print("📍 ENDPOINTS KYC:")
-    print("   📄 POST /kyc/validate-dni     - Validar DNI (Paso 1)")
-    print("   🤳 POST /kyc/verify-selfie    - Verificar selfie (Paso 2)") 
-    print("   🎥 POST /kyc/verify-liveness  - Verificar liveness (Paso 3)")
-    print("   📊 GET  /kyc/user-status/<doc> - Estado usuario")
-    print("   🏆 GET  /kyc/complete-verification/<doc> - Resumen final")
-    print("")
-    print("📍 UTILIDADES:")
-    print("   📤 POST /upload               - Subir archivos")
-    print("   📥 GET  /uploads/<file>       - Descargar archivos")
-    print("="*50)
-    
-    # Ejecutar servidor
-    app.run(
-        debug=True,
-        host='0.0.0.0', 
-        port=5000,
-        use_reloader=False  # Evita doble inicialización
-    )
