@@ -68,15 +68,10 @@ def allowed_file(filename):
 def index():
     return 'API FUNCIONANDO'
 
-# New route to serve the KYC verification flow (original)
+# Simple KYC verification route
 @app.route('/test')
 def kyc_verification():
     return render_template('kyc_verification.html')
-
-# New professional KYC verification route
-@app.route('/kyc')
-def kyc_verification_professional():
-    return render_template('kyc_verification_new.html')
 
 # Upload endpoint - handles both images and videos
 @app.route('/upload', methods=['POST'])
@@ -761,47 +756,132 @@ def analyze_video_liveness_with_deepface(video_path, reference_image_path):
         # 3. Intentar extraer frames (con fallback permisivo)
         video_frames = extract_video_frames_simple(video_path, num_frames=3)
         
-        # 4. Si NO se pudieron extraer frames, usar FALLBACK INTELIGENTE
+        # 4. Si NO se pudieron extraer frames, usar FALLBACK MEJORADO
         if not video_frames:
-            print("⚠️ No se pudieron extraer frames, usando fallback inteligente...")
+            print("⚠️ No se pudieron extraer frames con ningún método")
             
-            # Dar confianza basada en el tamaño del video
-            if video_size > 500000:  # >500KB = video grande, probablemente real
-                confidence = 75  # APPROVE
-                is_live = True
-                matches = True
-            elif video_size > 100000:  # >100KB = video mediano
-                confidence = 50  # REVIEW
-                is_live = True
-                matches = True
-            else:  # Video pequeño
-                confidence = 25  # REJECT
-                is_live = False
-                matches = False
-            
-            print(f"📊 FALLBACK: Confianza {confidence}% basada en tamaño")
-            
+            # Intentar analizar el video con métodos alternativos
+            try:
+                # Método 1: Verificar si es un video válido con información básica
+                cap = cv2.VideoCapture(video_path)
+                duration_seconds = 0
+                
+                if cap.isOpened():
+                    fps = cap.get(cv2.CAP_PROP_FPS) 
+                    frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+                    if fps > 0 and frame_count > 0:
+                        duration_seconds = frame_count / fps
+                    cap.release()
+                
+                # Basado en duración y tamaño
+                size_mb = video_size / (1024 * 1024)
+                
+                print(f"📊 Análisis fallback: {size_mb:.1f}MB, {duration_seconds:.1f}s")
+                
+                # Lógica mejorada para determinar si es real
+                if duration_seconds >= 2 and size_mb >= 0.5:  # Al menos 2 segundos y 500KB
+                    if size_mb > 3:  # Video grande, muy probable que sea real
+                        confidence = 85
+                        is_live = True
+                        matches = True
+                    elif size_mb > 1:  # Video mediano
+                        confidence = 70
+                        is_live = True 
+                        matches = True
+                    else:  # Video pequeño pero válido
+                        confidence = 55
+                        is_live = True
+                        matches = True
+                elif duration_seconds >= 1 and size_mb >= 0.1:  # Al menos 1 segundo
+                    confidence = 45  # REVIEW
+                    is_live = True
+                    matches = False
+                else:  # Video muy corto o pequeño
+                    confidence = 25  # REJECT
+                    is_live = False
+                    matches = False
+                
+                print(f"📊 FALLBACK MEJORADO: Confianza {confidence}% (duración: {duration_seconds}s, tamaño: {size_mb:.1f}MB)")
+                
+                return {
+                    "is_live_person": is_live,
+                    "matches_reference": matches,
+                    "confidence": confidence,
+                    "frames_analyzed": 0,
+                    "technical_details": {
+                        "fallback_method": "size_and_duration_analysis",
+                        "video_size_mb": round(size_mb, 2),
+                        "duration_seconds": round(duration_seconds, 1),
+                        "reason": "Frames no extraíbles, análisis basado en metadatos"
+                    }
+                }
+                
+            except Exception as fallback_error:
+                print(f"⚠️ Error en fallback mejorado: {fallback_error}")
+                
+                # Último recurso: solo basado en tamaño
+                if video_size > 500000:  # >500KB
+                    confidence = 60
+                    is_live = True
+                    matches = True
+                elif video_size > 100000:  # >100KB
+                    confidence = 40
+                    is_live = True
+                    matches = False
+                else:
+                    confidence = 20
+                    is_live = False
+                    matches = False
+                
+                print(f"📊 FALLBACK BÁSICO: Confianza {confidence}% basada solo en tamaño")
+                
+                return {
+                    "is_live_person": is_live,
+                    "matches_reference": matches,
+                    "confidence": confidence,
+                    "frames_analyzed": 0,
+                    "technical_details": {
+                        "fallback_method": "size_only_analysis",
+                        "video_size": video_size,
+                        "reason": "Análisis básico por tamaño de archivo"
+                    }
+                }
+        
+        # 5. Si SÍ se extrajeron frames, analizar con DeepFace
+        print(f"📊 Frames extraídos exitosamente: {len(video_frames)}")
+        
+        # Verificar que los frames sean válidos
+        valid_frames = []
+        for frame_path in video_frames:
+            if os.path.exists(frame_path) and os.path.getsize(frame_path) > 1000:  # Al menos 1KB
+                valid_frames.append(frame_path)
+                print(f"✅ Frame válido: {os.path.basename(frame_path)} ({os.path.getsize(frame_path)} bytes)")
+            else:
+                print(f"⚠️ Frame inválido o muy pequeño: {frame_path}")
+        
+        if not valid_frames:
+            print("❌ Ningún frame válido encontrado")
+            # Usar fallback si no hay frames válidos
             return {
-                "is_live_person": is_live,
-                "matches_reference": matches,
-                "confidence": confidence,
+                "is_live_person": True,
+                "matches_reference": False, 
+                "confidence": 35,
                 "frames_analyzed": 0,
                 "technical_details": {
-                    "fallback_used": True,
-                    "video_size": video_size,
-                    "reason": "No se pudieron extraer frames, usando heurística de tamaño"
+                    "frames_extracted": len(video_frames),
+                    "valid_frames": 0,
+                    "reason": "Frames extraídos pero ninguno válido"
                 }
             }
         
-        # 5. Si SÍ se extrajeron frames, analizar con DeepFace
-        print(f"📊 Frames extraídos: {len(video_frames)}")
-        
         frame_results = []
         successful_comparisons = 0
+        face_detection_attempts = 0
         
-        for i, frame_path in enumerate(video_frames):
+        for i, frame_path in enumerate(valid_frames):
             try:
-                print(f"🔍 Analizando frame {i+1}/{len(video_frames)}")
+                print(f"🔍 Analizando frame válido {i+1}/{len(valid_frames)}: {os.path.basename(frame_path)}")
+                face_detection_attempts += 1
                 
                 # Usar la misma función que en selfie (consistencia)
                 comparison = compare_faces_with_face_recognition(reference_image_path, frame_path)
@@ -809,54 +889,114 @@ def analyze_video_liveness_with_deepface(video_path, reference_image_path):
                 if comparison['confidence'] > 0:  # Si hubo detección exitosa
                     frame_results.append(comparison['confidence'])
                     successful_comparisons += 1
-                    print(f"✅ Frame {i+1}: {comparison['confidence']}% confianza")
+                    print(f"✅ Frame {i+1}: {comparison['confidence']}% confianza - {'MATCH' if comparison['face_match'] else 'NO MATCH'}")
                 else:
-                    print(f"⚠️ Frame {i+1}: Sin cara detectable")
+                    print(f"⚠️ Frame {i+1}: Sin cara detectable o error en comparación")
                     
             except Exception as e:
-                print(f"❌ Error en frame {i+1}: {e}")
+                print(f"❌ Error analizando frame {i+1}: {e}")
                 continue
         
-        # 6. Calcular resultados finales
+        print(f"📊 Resumen: {successful_comparisons}/{face_detection_attempts} frames analizados exitosamente")
+        
+        # 6. Calcular resultados finales con lógica mejorada y MÁS ESTRICTA
         if successful_comparisons == 0:
-            print("⚠️ Ningún frame tuvo caras, usando fallback moderado")
-            # Asumir que es real pero con baja confianza
+            print("❌ Ningún frame tuvo caras detectables - VIDEO INVÁLIDO")
+            
+            # Si se extrajeron frames pero no hay caras, es altamente sospechoso
             return {
-                "is_live_person": True,  # Asumir real
-                "matches_reference": False,  # Pero no match
-                "confidence": 30,  # REJECT pero no 0
-                "frames_analyzed": len(video_frames),
+                "is_live_person": False,  
+                "matches_reference": False,  
+                "confidence": 10,  # MUY BAJO - claramente fraudulento
+                "frames_analyzed": len(valid_frames),
                 "technical_details": {
                     "frames_extracted": len(video_frames),
+                    "valid_frames": len(valid_frames),
                     "frames_with_faces": 0,
-                    "reason": "Frames extraídos pero sin caras detectables"
+                    "reason": "❌ FRAUDE DETECTADO: Video sin caras detectables - posible pantalla en blanco o video falso"
                 }
             }
         
-        # 7. Calcular confianza promedio
+        # NUEVA LÓGICA: Requerir que al menos 70% de frames tengan caras
+        detection_rate = successful_comparisons / len(valid_frames)
+        
+        if detection_rate < 0.7:  # Menos del 70% de frames con caras es sospechoso
+            print(f"⚠️ BAJA TASA DE DETECCIÓN: {detection_rate*100:.1f}% - Posible fraude")
+            
+            # Calcular confianza promedio pero con penalización severa
+            avg_confidence = sum(frame_results) / len(frame_results) if frame_results else 0
+            
+            # Penalización severa por baja detección
+            severe_penalty = 40  # -40% por baja detección
+            final_confidence = max(5, int(avg_confidence - severe_penalty))  # Mínimo 5%
+            
+            return {
+                "is_live_person": False,  # NO es persona real si no aparece consistentemente
+                "matches_reference": False,  
+                "confidence": final_confidence,
+                "frames_analyzed": len(valid_frames),
+                "technical_details": {
+                    "frames_extracted": len(video_frames),
+                    "valid_frames": len(valid_frames),
+                    "frames_with_faces": successful_comparisons,
+                    "detection_rate": round(detection_rate * 100, 1),
+                    "avg_confidence_before_penalty": round(avg_confidence, 1),
+                    "severe_penalty_applied": severe_penalty,
+                    "reason": f"❌ DETECCIÓN INSUFICIENTE: Solo {successful_comparisons}/{len(valid_frames)} frames válidos ({detection_rate*100:.1f}%) - Requiere al menos 70%"
+                }
+            }
+        
+        # 7. Calcular confianza promedio y aplicar bonificaciones (SOLO si pasa el filtro de detección)
         avg_confidence = sum(frame_results) / len(frame_results)
         
-        # 8. Determinar si es persona real
-        is_live_person = True  # Asumir real si hay frames
-        matches_reference = avg_confidence >= 40  # Match si >40%
+        # Bonificación por múltiples detecciones exitosas (más conservadora)
+        consistency_bonus = 0
+        if successful_comparisons >= 2 and detection_rate >= 0.8:
+            consistency_bonus = 3  # Reducido de 5% a 3%
+        if successful_comparisons >= 3 and detection_rate >= 0.9:
+            consistency_bonus = 7  # Reducido de 10% a 7%
         
-        # 9. Ajustar confianza final
-        final_confidence = max(20, min(100, int(avg_confidence)))  # Mínimo 20%
+        # Penalización por detección imperfecta (pero aceptable)
+        detection_penalty = 0
+        if detection_rate < 0.9:  # Menos del 90% de frames con caras
+            detection_penalty = 10  # -10% penalización
+        elif detection_rate < 0.8:  # Menos del 80% de frames con caras
+            detection_penalty = 20  # -20% penalización más fuerte
+        
+        # 8. Determinar si es persona real (MÁS ESTRICTO)
+        is_live_person = (successful_comparisons >= 2 and 
+                         detection_rate >= 0.7 and 
+                         avg_confidence >= 50)  # Requiere al menos 50% de confianza promedio
+        
+        matches_reference = avg_confidence >= 45  # Ligeramente más estricto
+        
+        # 9. Calcular confianza final ajustada (MÁS CONSERVADORA)
+        raw_confidence = avg_confidence + consistency_bonus - detection_penalty
+        final_confidence = max(10, min(90, int(raw_confidence)))  # Entre 10% y 90% (más conservador)
+        
+        print(f"📊 Cálculo ESTRICTO final: avg={avg_confidence:.1f}%, bonus=+{consistency_bonus}%, penalty=-{detection_penalty}%, final={final_confidence}%")
+        print(f"📊 Detección: {successful_comparisons}/{len(valid_frames)} frames ({detection_rate*100:.1f}% tasa) - {'✅ SUFICIENTE' if detection_rate >= 0.7 else '❌ INSUFICIENTE'}")
         
         result = {
             "is_live_person": is_live_person,
             "matches_reference": matches_reference,
             "confidence": final_confidence,
-            "frames_analyzed": len(video_frames),
+            "frames_analyzed": len(valid_frames),
             "technical_details": {
                 "frames_with_faces": successful_comparisons,
                 "confidence_per_frame": frame_results,
-                "avg_confidence": avg_confidence,
-                "video_size": video_size
+                "avg_confidence": round(avg_confidence, 1),
+                "consistency_bonus": consistency_bonus,
+                "detection_penalty": detection_penalty,
+                "detection_rate": round(detection_rate * 100, 1),
+                "detection_threshold_met": detection_rate >= 0.7,
+                "video_size": video_size,
+                "frames_extracted": len(video_frames),
+                "valid_frames": len(valid_frames)
             }
         }
         
-        print(f"🎯 RESULTADO VIDEO: Live={is_live_person}, Match={matches_reference}, Confianza={final_confidence}%")
+        print(f"🎥 Análisis completado - Live: {is_live_person}, Match: {matches_reference}, Score: {final_confidence}%")
         return result
         
     except Exception as e:
@@ -889,7 +1029,7 @@ def analyze_video_liveness_with_deepface(video_path, reference_image_path):
 
 def extract_video_frames_simple(video_path, num_frames=3):
     """
-    🎬 Extracción SIMPLE de frames de video
+    🎬 Extracción MEJORADA de frames de video con múltiples métodos
     
     Args:
         video_path (str): Ruta del video
@@ -901,28 +1041,65 @@ def extract_video_frames_simple(video_path, num_frames=3):
     try:
         print(f"🎬 Extrayendo {num_frames} frames de: {video_path}")
         
-        # Abrir video
+        # MÉTODO 1: Intentar con OpenCV normal
         cap = cv2.VideoCapture(video_path)
         
         if not cap.isOpened():
-            print(f"❌ No se pudo abrir el video: {video_path}")
-            return []
+            print(f"⚠️ OpenCV no pudo abrir directamente, intentando con FFmpeg...")
+            # MÉTODO 2: Intentar con backend FFmpeg
+            cap = cv2.VideoCapture(video_path, cv2.CAP_FFMPEG)
+        
+        if not cap.isOpened():
+            print(f"⚠️ FFmpeg tampoco funcionó, intentando conversión temporal...")
+            # MÉTODO 3: Usar FFmpeg externo si está disponible
+            try:
+                import subprocess
+                temp_video_path = video_path + "_temp.mp4"
+                
+                # Convertir a formato más compatible
+                result = subprocess.run([
+                    'ffmpeg', '-i', video_path, 
+                    '-vcodec', 'libx264', 
+                    '-acodec', 'aac', 
+                    '-y', temp_video_path
+                ], capture_output=True, text=True, timeout=30)
+                
+                if result.returncode == 0 and os.path.exists(temp_video_path):
+                    print("✅ Video convertido con FFmpeg externo")
+                    cap = cv2.VideoCapture(temp_video_path)
+                    # Limpiar archivo temporal después
+                    try:
+                        os.remove(temp_video_path)
+                    except:
+                        pass
+            except Exception as e:
+                print(f"⚠️ FFmpeg externo no disponible: {e}")
+        
+        if not cap.isOpened():
+            print(f"❌ Todos los métodos fallaron, usando método de lecttura secuencial...")
+            return extract_frames_sequential_read(video_path, num_frames)
         
         # Info del video
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         fps = cap.get(cv2.CAP_PROP_FPS)
         
-        print(f"🎬 Video: {total_frames} frames, {fps:.1f} FPS")
+        # Validar valores del video
+        if total_frames <= 0 or total_frames > 1000000:  # Valores inválidos
+            print(f"⚠️ Información del video inválida (frames: {total_frames}, fps: {fps})")
+            print("🔄 Usando método de lectura secuencial...")
+            cap.release()
+            return extract_frames_sequential_read(video_path, num_frames)
+        
+        print(f"🎬 Video válido: {total_frames} frames, {fps:.1f} FPS")
         
         if total_frames < num_frames:
-            num_frames = total_frames
+            num_frames = min(total_frames, num_frames)
         
-        # Frames a extraer (distribuidos uniformemente)
-        frame_indices = []
+        # Calcular índices de frames a extraer
         if num_frames == 1:
             frame_indices = [total_frames // 2]
         else:
-            step = total_frames // (num_frames + 1)
+            step = max(1, total_frames // (num_frames + 1))
             frame_indices = [step * (i + 1) for i in range(num_frames)]
         
         # Extraer frames
@@ -930,26 +1107,88 @@ def extract_video_frames_simple(video_path, num_frames=3):
         base_filename = os.path.splitext(os.path.basename(video_path))[0]
         
         for i, frame_index in enumerate(frame_indices):
+            # Intentar posicionarse en el frame
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
             ret, frame = cap.read()
             
-            if ret:
+            if ret and frame is not None:
                 # Guardar frame
                 frame_filename = f"{base_filename}_frame_{i+1}.jpg"
                 frame_path = os.path.join(UPLOAD_FOLDER, frame_filename)
                 
-                cv2.imwrite(frame_path, frame)
-                extracted_frames.append(frame_path)
-                print(f"📸 Frame {i+1} guardado: {frame_path}")
+                # Verificar que el frame no esté corrupto
+                if frame.shape[0] > 0 and frame.shape[1] > 0:
+                    cv2.imwrite(frame_path, frame)
+                    extracted_frames.append(frame_path)
+                    print(f"📸 Frame {i+1} guardado: {frame_path}")
+                else:
+                    print(f"⚠️ Frame {i+1} corrupto, saltando...")
             else:
                 print(f"⚠️ No se pudo extraer frame en posición {frame_index}")
         
         cap.release()
-        print(f"✅ Extraídos {len(extracted_frames)} frames")
+        
+        if not extracted_frames:
+            print("⚠️ Ningún frame extraído con método estándar, probando secuencial...")
+            return extract_frames_sequential_read(video_path, num_frames)
+        
+        print(f"✅ Extraídos {len(extracted_frames)} frames correctamente")
         return extracted_frames
         
     except Exception as e:
         print(f"❌ Error extrayendo frames: {e}")
+        # Último recurso: método secuencial
+        return extract_frames_sequential_read(video_path, num_frames)
+
+
+def extract_frames_sequential_read(video_path, num_frames=3):
+    """
+    🎬 Método ALTERNATIVO: Lectura secuencial de video
+    Para videos que OpenCV no puede leer normalmente
+    """
+    try:
+        print(f"🔄 MÉTODO ALTERNATIVO: Lectura secuencial de {video_path}")
+        
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            print("❌ Método secuencial también falló")
+            return []
+        
+        extracted_frames = []
+        base_filename = os.path.splitext(os.path.basename(video_path))[0]
+        frame_count = 0
+        saved_frames = 0
+        
+        # Leer frames uno por uno hasta conseguir los necesarios
+        while saved_frames < num_frames:
+            ret, frame = cap.read()
+            
+            if not ret:
+                break
+                
+            frame_count += 1
+            
+            # Guardar cada N frames para distribuir en el tiempo
+            if frame_count % max(1, (30 // num_frames)) == 0:  # Aproximadamente cada segundo
+                frame_filename = f"{base_filename}_seq_frame_{saved_frames+1}.jpg"
+                frame_path = os.path.join(UPLOAD_FOLDER, frame_filename)
+                
+                if frame.shape[0] > 0 and frame.shape[1] > 0:
+                    cv2.imwrite(frame_path, frame)
+                    extracted_frames.append(frame_path)
+                    saved_frames += 1
+                    print(f"📸 Frame secuencial {saved_frames} guardado: {frame_path}")
+            
+            # Límite de seguridad
+            if frame_count > 300:  # Máximo 10 segundos a 30fps
+                break
+        
+        cap.release()
+        print(f"✅ Método secuencial: {len(extracted_frames)} frames de {frame_count} leídos")
+        return extracted_frames
+        
+    except Exception as e:
+        print(f"❌ Error en método secuencial: {e}")
         return []
 
 

@@ -7,121 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <!-- Face Detection Libraries - Sistema más simple y confiable -->
-    <script>
-        // Sistema de detección facial REAL con JavaScript puro
-        window.FaceDetectionUtils = {
-            // Canvas para análisis de frames
-            analysisCanvas: null,
-            analysisContext: null,
-            
-            // Inicializar canvas de análisis
-            initAnalysisCanvas() {
-                this.analysisCanvas = document.createElement('canvas');
-                this.analysisContext = this.analysisCanvas.getContext('2d');
-                this.analysisCanvas.width = 320;
-                this.analysisCanvas.height = 240;
-            },
-            
-            // Detectar cambios de brillo en regiones de la cara
-            detectFaceMovement(videoElement) {
-                if (!this.analysisCanvas) this.initAnalysisCanvas();
-                
-                try {
-                    // Verificar que el video está disponible
-                    if (!videoElement || videoElement.videoWidth === 0 || videoElement.videoHeight === 0) {
-                        return null;
-                    }
-                    
-                    // Capturar frame del video
-                    this.analysisContext.drawImage(videoElement, 0, 0, 320, 240);
-                    const imageData = this.analysisContext.getImageData(0, 0, 320, 240);
-                    const pixels = imageData.data;
-                    
-                    // Verificar que tenemos datos de imagen válidos
-                    if (!pixels || pixels.length === 0) {
-                        return null;
-                    }
-                    
-                    // Analizar regiones específicas para detectar movimientos
-                    const regions = {
-                        center: this.analyzeRegion(pixels, 120, 80, 80, 80, 320), // Centro de la cara
-                        left: this.analyzeRegion(pixels, 40, 80, 60, 80, 320),    // Izquierda
-                        right: this.analyzeRegion(pixels, 220, 80, 60, 80, 320),  // Derecha
-                        top: this.analyzeRegion(pixels, 120, 40, 80, 60, 320),    // Arriba
-                        bottom: this.analyzeRegion(pixels, 120, 140, 80, 60, 320), // Abajo
-                        mouth: this.analyzeRegion(pixels, 140, 160, 40, 30, 320)   // Zona boca
-                    };
-                    
-                    // Verificar que las regiones tienen datos válidos
-                    const overallBrightness = this.calculateOverallBrightness(pixels);
-                    
-                    // Solo retornar si hay suficiente brillo (rostro detectado)
-                    if (overallBrightness > 30 && regions.center > 30) { // Umbrales más bajos
-                        return {
-                            regions,
-                            movement: this.calculateMovement(regions),
-                            brightness: overallBrightness,
-                            faceDetected: true
-                        };
-                    } else if (overallBrightness > 15) { // Detectar presencia parcial
-                        return {
-                            regions,
-                            movement: this.calculateMovement(regions),
-                            brightness: overallBrightness,
-                            faceDetected: false // Presente pero no claro
-                        };
-                    } else {
-                        return null; // Sin presencia
-                    }
-                } catch (error) {
-                    console.warn('Error en análisis de frame:', error);
-                    return null;
-                }
-            },
-            
-            // Analizar región específica
-            analyzeRegion(pixels, x, y, width, height, canvasWidth) {
-                let totalBrightness = 0;
-                let pixelCount = 0;
-                
-                for (let py = y; py < y + height; py++) {
-                    for (let px = x; px < x + width; px++) {
-                        const index = (py * canvasWidth + px) * 4;
-                        if (index < pixels.length - 3) {
-                            const r = pixels[index];
-                            const g = pixels[index + 1];
-                            const b = pixels[index + 2];
-                            totalBrightness += (r + g + b) / 3;
-                            pixelCount++;
-                        }
-                    }
-                }
-                
-                return pixelCount > 0 ? totalBrightness / pixelCount : 0;
-            },
-            
-            // Calcular movimiento basado en cambios de brillo
-            calculateMovement(regions) {
-                return {
-                    horizontal: (regions.right - regions.left) / 255 * 100,
-                    vertical: (regions.bottom - regions.top) / 255 * 100,
-                    centerFocus: regions.center / 255 * 100
-                };
-            },
-            
-            // Calcular brillo general
-            calculateOverallBrightness(pixels) {
-                let total = 0;
-                for (let i = 0; i < pixels.length; i += 16) { // Sample every 4th pixel
-                    total += (pixels[i] + pixels[i+1] + pixels[i+2]) / 3;
-                }
-                return total / (pixels.length / 16);
-            }
-        };
-        
-        console.log('🎯 Sistema de detección REAL inicializado');
-    </script>
+
     <style>
         .step-active { @apply bg-blue-600 text-white; }
         .step-completed { @apply bg-green-600 text-white; }
@@ -412,226 +298,89 @@
                     </div>
                 </div>
 
-                <!-- PASO 3: Verificación de Vida -->
-                <div x-show="currentStep === 3" class="p-4">
-                    <!-- Header minimalista -->
-                    <div class="text-center mb-6">
-                        <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full mb-3">
-                            <i class="fas fa-shield-check text-2xl text-white"></i>
-                        </div>
-                        <h2 class="text-2xl font-bold text-gray-800 mb-1">Verificación de Identidad</h2>
-                        <p class="text-gray-500 text-sm">Verificación biométrica en tiempo real</p>
+                <!-- PASO 3: Verificación de Vida SIMPLIFICADA -->
+                <div x-show="currentStep === 3" class="p-8">
+                    <div class="text-center mb-8">
+                        <i class="fas fa-video text-5xl text-purple-600 mb-4"></i>
+                        <h2 class="text-3xl font-bold text-gray-800 mb-2">Verificación de Vida</h2>
+                        <p class="text-gray-600">Grabe un video corto siguiendo las instrucciones</p>
                     </div>
 
-                    <!-- Layout Professional: Video + Instrucciones lado a lado -->
-                    <div class="flex flex-col lg:flex-row gap-6 max-w-6xl mx-auto">
-                        
-                        <!-- Panel Izquierdo: Video Principal -->
-                        <div class="lg:w-2/3">
-                            <div class="relative bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl overflow-hidden shadow-2xl">
-                                <!-- Video Stream -->
-                                <video x-ref="recordVideo" autoplay class="w-full h-96 lg:h-[500px] object-cover" 
-                                       style="transform: scaleX(-1);"></video>
-                                
-                                <!-- Status indicators - Esquina superior -->
-                                <div class="absolute top-4 left-4 right-4 flex justify-between items-start z-10">
-                                    <!-- Recording Indicator -->
-                                    <div x-show="recording" class="flex items-center bg-red-500 text-white px-3 py-2 rounded-full shadow-lg">
-                                        <div class="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></div>
-                                        <span class="text-sm font-semibold">GRABANDO</span>
-                                    </div>
-                                    
-                                    <!-- Status general -->
-                                    <div x-show="!recording && videoActive" class="bg-green-500 text-white px-3 py-2 rounded-full shadow-lg">
-                                        <span class="text-sm font-semibold">PREPARADO</span>
-                                    </div>
-                                    
-                                    <!-- Timer -->
-                                    <div x-show="recording" class="bg-black bg-opacity-70 text-white px-4 py-2 rounded-full shadow-lg">
-                                        <span x-text="recordingTime" class="text-sm font-mono font-bold"></span>
-                                    </div>
-                                </div>
-
-                <!-- Guías faciales sutiles - SIN tapar cara -->
-                <div x-show="videoActive && !recording" class="absolute inset-0 flex items-center justify-center pointer-events-none z-5">
-                    <!-- Marco facial sutil -->
-                    <div class="relative">
-                        <!-- Esquinas del marco (como cámara profesional) -->
-                        <div class="absolute -top-4 -left-4 w-8 h-8 border-l-4 border-t-4 border-white opacity-80 rounded-tl-lg"></div>
-                        <div class="absolute -top-4 -right-4 w-8 h-8 border-r-4 border-t-4 border-white opacity-80 rounded-tr-lg"></div>
-                        <div class="absolute -bottom-4 -left-4 w-8 h-8 border-l-4 border-b-4 border-white opacity-80 rounded-bl-lg"></div>
-                        <div class="absolute -bottom-4 -right-4 w-8 h-8 border-r-4 border-b-4 border-white opacity-80 rounded-br-lg"></div>
-                        
-                        <!-- Área de rostro sugerida -->
-                        <div class="w-48 h-64 bg-transparent border-2 border-dashed border-white opacity-50 rounded-3xl"></div>
-                        
-                        <!-- Texto de posicionamiento - ABAJO del marco -->
-                        <div class="absolute -bottom-12 left-1/2 transform -translate-x-1/2 text-white text-center">
-                            <div class="bg-black bg-opacity-60 rounded-full px-4 py-2 text-sm font-medium">
-                                👤 Posicione su rostro en el marco
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- NUEVO: Marco dinámico durante grabación con feedback -->
-                <div x-show="recording" class="absolute inset-0 flex items-center justify-center pointer-events-none z-5">
-                    <div class="relative">
-                        <!-- Marco dinámico que cambia de color según el progreso -->
-                        <div class="absolute -top-4 -left-4 w-8 h-8 border-l-4 border-t-4 rounded-tl-lg transition-all duration-300"
-                             :class="getFrameColorClass()"></div>
-                        <div class="absolute -top-4 -right-4 w-8 h-8 border-r-4 border-t-4 rounded-tr-lg transition-all duration-300"
-                             :class="getFrameColorClass()"></div>
-                        <div class="absolute -bottom-4 -left-4 w-8 h-8 border-l-4 border-b-4 rounded-bl-lg transition-all duration-300"
-                             :class="getFrameColorClass()"></div>
-                        <div class="absolute -bottom-4 -right-4 w-8 h-8 border-r-4 border-b-4 rounded-br-lg transition-all duration-300"
-                             :class="getFrameColorClass()"></div>
-                        
-                        <!-- Área de rostro con color dinámico -->
-                        <div class="w-48 h-64 bg-transparent border-2 border-dashed rounded-3xl transition-all duration-300"
-                             :class="getFrameColorClass()"></div>
-                        
-                        <!-- Feedback en tiempo real - ENCIMA del marco -->
-                        <div class="absolute -top-20 left-1/2 transform -translate-x-1/2 text-center">
-                            <div class="bg-black bg-opacity-80 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-300"
-                                 :class="getFeedbackTextClass()">
-                                <span x-text="realTimeFeedback"></span>
-                                <!-- NUEVO: Indicador de modo de detección -->
-                                <div class="text-xs mt-1 opacity-75">
-                                    <span x-show="detectionMode === 'basic'">🔄 Modo simulado</span>
-                                    <span x-show="detectionMode === 'tensorflow'">🎯 IA avanzada</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>                                <!-- Indicador de progreso de instrucción - ABAJO del video -->
-                                <div x-show="recording && currentInstruction" class="absolute bottom-4 left-4 right-4 z-10">
-                                    <div class="bg-black bg-opacity-70 rounded-xl p-4">
-                                        <div class="flex items-center justify-between text-white mb-2">
-                                            <span class="text-lg font-semibold" x-text="currentInstruction?.title || 'Preparando...'"></span>
-                                            <div class="text-2xl" x-text="currentInstruction?.icon || '⏳'"></div>
-                                        </div>
-                                        <div class="bg-gray-600 rounded-full h-2 mb-1">
-                                            <div class="bg-gradient-to-r from-purple-500 to-indigo-500 h-2 rounded-full transition-all duration-300" 
-                                                 :class="instructionProgress >= 100 ? 'bg-gradient-to-r from-green-500 to-emerald-500' : ''"
-                                                 :style="`width: ${instructionProgress}%`"></div>
-                                        </div>
-                                        <p class="text-gray-300 text-sm" x-text="currentInstruction?.description || 'Iniciando verificación...'"></p>
-                                        
-                                        <!-- NUEVO: Contador de intentos y feedback específico -->
-                                        <div x-show="currentInstruction?.attempts > 0" class="mt-2 text-yellow-300 text-xs">
-                                            <i class="fas fa-redo mr-1"></i>
-                                            Intento <span x-text="(currentInstruction?.attempts || 0) + 1"></span> - 
-                                            <span x-text="getInstructionHint()"></span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Panel Derecho: Instrucciones y Controles -->
-                        <div class="lg:w-1/3 space-y-6">
+                    <div class="max-w-2xl mx-auto">
+                        <!-- Video Stream -->
+                        <div class="relative bg-gray-100 rounded-lg overflow-hidden shadow-lg mb-6">
+                            <video x-ref="recordVideo" autoplay class="w-full h-80 object-cover" style="transform: scaleX(-1);"></video>
                             
-                            <!-- Estado actual -->
-                            <div x-show="!videoActive && !recordedVideo" class="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-6 border border-purple-100">
-                                <h3 class="font-bold text-purple-800 mb-3 flex items-center">
-                                    <i class="fas fa-video mr-2"></i>
-                                    Preparar Cámara
-                                </h3>
-                                <p class="text-purple-700 text-sm mb-4">Active su cámara para comenzar la verificación biométrica en tiempo real.</p>
-                                <button @click="startVideoCamera()" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg">
+                            <!-- Recording Indicator -->
+                            <div x-show="recording" class="absolute top-4 right-4 bg-red-600 text-white px-3 py-2 rounded-full shadow-lg">
+                                <i class="fas fa-circle animate-pulse mr-2"></i>
+                                <span class="text-sm font-bold">REC</span>
+                            </div>
+                            
+                            <!-- Timer -->
+                            <div x-show="recording" class="absolute top-4 left-4 bg-black bg-opacity-70 text-white px-3 py-2 rounded-full">
+                                <span x-text="recordingTime" class="text-sm font-mono"></span>
+                            </div>
+
+                            <!-- Instrucción Actual -->
+                            <div x-show="recording && currentMessage" class="absolute bottom-4 left-4 right-4">
+                                <div class="bg-black bg-opacity-80 text-white p-4 rounded-lg text-center">
+                                    <div class="text-2xl mb-2" x-text="currentIcon"></div>
+                                    <h3 class="text-lg font-bold mb-1" x-text="currentMessage"></h3>
+                                    <div class="bg-gray-600 rounded-full h-2 mb-2">
+                                        <div class="bg-blue-500 h-2 rounded-full transition-all duration-300" :style="`width: ${progress}%`"></div>
+                                    </div>
+                                    <p class="text-sm opacity-75" x-text="`${Math.ceil(timeRemaining)}s restantes`"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Controls -->
+                        <div class="text-center space-y-4">
+                            <!-- Start Camera -->
+                            <div x-show="!videoActive && !recordedVideo">
+                                <button @click="startVideoCamera()" class="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors">
                                     <i class="fas fa-camera mr-2"></i>Activar Cámara
                                 </button>
                             </div>
 
-                            <!-- Instrucciones previas -->
-                            <div x-show="videoActive && !recording && !recordedVideo" class="bg-blue-50 rounded-xl p-6 border border-blue-200">
-                                <h3 class="font-bold text-blue-800 mb-4 flex items-center">
-                                    <i class="fas fa-list-check mr-2"></i>
-                                    Instrucciones
-                                </h3>
-                                <div class="space-y-3">
-                                    <div class="flex items-start">
-                                        <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold mr-3 mt-0.5">1</div>
-                                        <p class="text-blue-700 text-sm">Posicione su rostro dentro del marco</p>
-                                    </div>
-                                    <div class="flex items-start">
-                                        <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold mr-3 mt-0.5">2</div>
-                                        <p class="text-blue-700 text-sm">Siga las instrucciones en tiempo real</p>
-                                    </div>
-                                    <div class="flex items-start">
-                                        <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold mr-3 mt-0.5">3</div>
-                                        <p class="text-blue-700 text-sm">Realice movimientos naturales y claros</p>
-                                    </div>
-                                    <div class="flex items-start">
-                                        <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold mr-3 mt-0.5">4</div>
-                                        <p class="text-blue-700 text-sm">El proceso dura aproximadamente 15 segundos</p>
-                                    </div>
+                            <!-- Start Recording -->
+                            <div x-show="videoActive && !recording && !recordedVideo">
+                                <div class="mb-6 p-4 bg-blue-50 rounded-lg border">
+                                    <h4 class="font-bold text-blue-800 mb-2">📋 Instrucciones del Video:</h4>
+                                    <ol class="text-sm text-blue-700 text-left space-y-1">
+                                        <li>1. 👀 Mire directamente a la cámara (5 segundos)</li>
+                                        <li>2. ↔️ Gire la cabeza lentamente izquierda y derecha (5 segundos)</li>
+                                        <li>3. 😊 Sonría de forma natural (5 segundos)</li>
+                                    </ol>
+                                    <p class="text-xs text-blue-600 mt-2">Total: 15 segundos de grabación</p>
                                 </div>
-                                
-                                <button @click="startLivenessRecording()" class="w-full mt-6 bg-gradient-to-r from-red-500 to-pink-500 text-white py-3 rounded-lg font-semibold hover:from-red-600 hover:to-pink-600 transition-all shadow-lg">
-                                    <i class="fas fa-shield-check mr-2"></i>Iniciar Verificación
+                                <button @click="startRecording()" class="bg-red-600 text-white px-8 py-3 rounded-lg hover:bg-red-700 transition-colors">
+                                    <i class="fas fa-play mr-2"></i>Iniciar Grabación
                                 </button>
                             </div>
 
-                            <!-- Status durante grabación -->
-                            <div x-show="recording && !currentInstruction" class="bg-green-50 rounded-xl p-6 border border-green-200">
-                                <div class="text-center">
-                                    <div class="inline-flex items-center justify-center w-12 h-12 bg-green-100 rounded-full mb-3">
-                                        <i class="fas fa-spinner fa-spin text-green-600 text-xl"></i>
-                                    </div>
-                                    <h3 class="font-bold text-green-800 mb-2">Preparando Verificación</h3>
-                                    <p class="text-green-700 text-sm">Manténgase en posición mientras iniciamos el análisis...</p>
+                            <!-- Processing -->
+                            <div x-show="processing" class="py-8">
+                                <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+                                    <i class="fas fa-cog fa-spin text-2xl text-blue-600"></i>
                                 </div>
+                                <p class="text-blue-600 font-medium">Procesando video...</p>
                             </div>
 
-                            <!-- Próxima instrucción -->
-                            <div x-show="recording && currentInstruction" class="bg-white rounded-xl p-6 border-2 border-purple-200 shadow-lg">
-                                <div class="text-center">
-                                    <div class="text-4xl mb-3" x-text="currentInstruction?.icon || '⏳'"></div>
-                                    <h3 class="font-bold text-gray-800 mb-2" x-text="currentInstruction?.title || 'Cargando...'"></h3>
-                                    <p class="text-gray-600 text-sm mb-4" x-text="currentInstruction?.description || 'Preparando instrucción...'"></p>
-                                    
-                                    <!-- Progress ring -->
-                                    <div class="relative w-16 h-16 mx-auto">
-                                        <svg class="w-16 h-16 transform -rotate-90" viewBox="0 0 64 64">
-                                            <circle cx="32" cy="32" r="28" stroke-width="4" stroke="#e5e7eb" fill="none"></circle>
-                                            <circle cx="32" cy="32" r="28" stroke-width="4" stroke="#8b5cf6" fill="none"
-                                                    :stroke-dasharray="`${instructionProgress * 1.75} 175`"
-                                                    class="transition-all duration-300"></circle>
-                                        </svg>
-                                        <div class="absolute inset-0 flex items-center justify-center">
-                                            <span class="text-xs font-bold text-purple-600" x-text="`${Math.round(instructionProgress)}%`"></span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Resultado final -->
-                            <div x-show="recordedVideo" class="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
-                                <div class="text-center mb-4">
-                                    <div class="inline-flex items-center justify-center w-12 h-12 bg-green-100 rounded-full mb-3">
-                                        <i class="fas fa-check text-green-600 text-xl"></i>
-                                    </div>
-                                    <h3 class="font-bold text-green-800 mb-2">¡Verificación Completada!</h3>
-                                    <p class="text-green-700 text-sm">Su identidad ha sido verificada exitosamente</p>
-                                </div>
-                                
-                                <div class="flex space-x-3">
-                                    <button @click="retakeVideo()" class="flex-1 bg-gray-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-gray-700 transition-colors">
-                                        <i class="fas fa-redo mr-1"></i>Repetir
+                            <!-- Recorded Video -->
+                            <div x-show="recordedVideo && !processing">
+                                <video :src="recordedVideo" controls class="w-full h-64 rounded-lg shadow-lg mb-4"></video>
+                                <div class="flex space-x-4 justify-center">
+                                    <button @click="retakeVideo()" class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700">
+                                        <i class="fas fa-redo mr-2"></i>Repetir
                                     </button>
-                                    <button @click="nextStep()" class="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white py-2 rounded-lg text-sm font-medium hover:from-green-700 hover:to-emerald-700 transition-all">
-                                        <i class="fas fa-check mr-1"></i>Continuar
+                                    <button @click="nextStep()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
+                                        <i class="fas fa-check mr-2"></i>Continuar
                                     </button>
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- Video de resultado (cuando se completa) -->
-                    <div x-show="recordedVideo" class="max-w-2xl mx-auto mt-6">
-                        <video :src="recordedVideo" controls class="w-full h-64 rounded-xl shadow-lg"></video>
                     </div>
 
                     <div class="flex justify-between mt-8">
@@ -889,37 +638,278 @@
                                     </div>
                                 </div>
 
-                                <!-- Face Comparison Results -->
+                                <!-- Face Comparison Results - MEJORADO CON DETALLES COMPLETOS -->
                                 <div class="space-y-4">
-                                    <div class="p-4 bg-white rounded-lg border">
-                                        <div class="flex justify-between items-start">
+                                    <!-- DNI Validation Results -->
+                                    <div class="p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+                                        <div class="flex justify-between items-start mb-3">
                                             <div>
-                                                <h5 class="font-medium text-gray-800">👤 DNI vs Selfie:</h5>
-                                                <p class="text-sm text-gray-600">Comparación facial entre documento y selfie</p>
+                                                <h5 class="font-medium text-gray-800 flex items-center">
+                                                    <i class="fas fa-id-card text-blue-600 mr-2"></i>
+                                                    📄 Validación de Documento (Paso 1)
+                                                </h5>
+                                                <p class="text-sm text-gray-600">Análisis y extracción de datos del DNI/ID</p>
                                             </div>
-                                            <span :class="verificationResult.dniMatch ? 'text-green-600' : 'text-red-600'" class="font-medium">
-                                                <i :class="verificationResult.dniMatch ? 'fas fa-check-circle' : 'fas fa-times-circle'" class="mr-1"></i>
-                                                <span x-text="verificationResult.dniMatch ? 'COINCIDE' : 'NO COINCIDE'"></span>
-                                            </span>
+                                            <div class="text-right">
+                                                <span :class="getStatusClass(step1Result?.recommendation)" 
+                                                      class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium">
+                                                    <i :class="getStatusIcon(step1Result?.recommendation)" class="mr-1"></i>
+                                                    <span x-text="getStatusText(step1Result?.recommendation)"></span>
+                                                </span>
+                                                <div class="text-lg font-bold mt-1" 
+                                                     :class="getConfidenceClass(step1Result?.confidence)" 
+                                                     x-text="`${step1Result?.confidence || 0}%`"></div>
+                                            </div>
                                         </div>
-                                        <div x-show="!verificationResult.dniMatch" class="mt-2 text-sm text-red-600">
-                                            ⚠️ La cara del DNI no coincide con el selfie tomado
+                                        
+                                        <!-- DNI Analysis Details -->
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                            <div class="space-y-2">
+                                                <h6 class="text-sm font-semibold text-gray-700">Análisis del Documento:</h6>
+                                                <div x-show="step1Result?.document_analysis" class="text-sm space-y-1">
+                                                    <div class="flex justify-between">
+                                                        <span class="text-gray-600">Tipo de documento:</span>
+                                                        <span class="font-medium" x-text="step1Result?.document_analysis?.document_type || 'No detectado'"></span>
+                                                    </div>
+                                                    <div class="flex justify-between">
+                                                        <span class="text-gray-600">Válido para país:</span>
+                                                        <span :class="step1Result?.document_analysis?.country_match ? 'text-green-600' : 'text-red-600'" 
+                                                              class="font-medium flex items-center">
+                                                            <i :class="step1Result?.document_analysis?.country_match ? 'fas fa-check' : 'fas fa-times'" class="mr-1"></i>
+                                                            <span x-text="step1Result?.document_analysis?.country_match ? 'SÍ' : 'NO'"></span>
+                                                        </span>
+                                                    </div>
+                                                    <div class="flex justify-between">
+                                                        <span class="text-gray-600">Documento válido:</span>
+                                                        <span :class="step1Result?.document_analysis?.is_valid_document ? 'text-green-600' : 'text-red-600'" 
+                                                              class="font-medium flex items-center">
+                                                            <i :class="step1Result?.document_analysis?.is_valid_document ? 'fas fa-check-circle' : 'fas fa-times-circle'" class="mr-1"></i>
+                                                            <span x-text="step1Result?.document_analysis?.is_valid_document ? 'SÍ' : 'NO'"></span>
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="space-y-2">
+                                                <h6 class="text-sm font-semibold text-gray-700">Coincidencia de Datos:</h6>
+                                                <div x-show="step1Result?.data_matches" class="text-sm space-y-1">
+                                                    <div class="flex justify-between">
+                                                        <span class="text-gray-600">Nombre:</span>
+                                                        <span :class="step1Result?.data_matches?.name ? 'text-green-600' : 'text-red-600'" class="font-medium flex items-center">
+                                                            <i :class="step1Result?.data_matches?.name ? 'fas fa-check' : 'fas fa-times'" class="mr-1"></i>
+                                                            <span x-text="step1Result?.data_matches?.name ? 'Coincide' : 'No coincide'"></span>
+                                                        </span>
+                                                    </div>
+                                                    <div class="flex justify-between">
+                                                        <span class="text-gray-600">Documento:</span>
+                                                        <span :class="step1Result?.data_matches?.document_number ? 'text-green-600' : 'text-red-600'" class="font-medium flex items-center">
+                                                            <i :class="step1Result?.data_matches?.document_number ? 'fas fa-check' : 'fas fa-times'" class="mr-1"></i>
+                                                            <span x-text="step1Result?.data_matches?.document_number ? 'Coincide' : 'No coincide'"></span>
+                                                        </span>
+                                                    </div>
+                                                    <div class="flex justify-between">
+                                                        <span class="text-gray-600">Fechas:</span>
+                                                        <span :class="(step1Result?.data_matches?.birthdate && step1Result?.data_matches?.issue_date && step1Result?.data_matches?.expiry_date) ? 'text-green-600' : 'text-orange-600'" 
+                                                              class="font-medium flex items-center">
+                                                            <i :class="(step1Result?.data_matches?.birthdate && step1Result?.data_matches?.issue_date && step1Result?.data_matches?.expiry_date) ? 'fas fa-check' : 'fas fa-exclamation-triangle'" class="mr-1"></i>
+                                                            <span x-text="(step1Result?.data_matches?.birthdate && step1Result?.data_matches?.issue_date && step1Result?.data_matches?.expiry_date) ? 'Todas correctas' : 'Algunas fallan'"></span>
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Analysis Message -->
+                                        <div x-show="step1Result?.details" class="mt-4 p-3 bg-gray-50 rounded-lg">
+                                            <p class="text-sm text-gray-700" x-text="step1Result?.details"></p>
                                         </div>
                                     </div>
 
-                                    <div class="p-4 bg-white rounded-lg border">
-                                        <div class="flex justify-between items-start">
+                                    <!-- Selfie vs DNI Comparison Results -->
+                                    <div class="p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+                                        <div class="flex justify-between items-start mb-3">
                                             <div>
-                                                <h5 class="font-medium text-gray-800">🎬 Selfie vs Video:</h5>
-                                                <p class="text-sm text-gray-600">Verificación de vida - detección en video</p>
+                                                <h5 class="font-medium text-gray-800 flex items-center">
+                                                    <i class="fas fa-user-check text-green-600 mr-2"></i>
+                                                    🤳 Verificación Facial: DNI vs Selfie (Paso 2)
+                                                </h5>
+                                                <p class="text-sm text-gray-600">Comparación facial entre documento de identidad y selfie</p>
                                             </div>
-                                            <span :class="verificationResult.videoMatch ? 'text-green-600' : 'text-red-600'" class="font-medium">
-                                                <i :class="verificationResult.videoMatch ? 'fas fa-check-circle' : 'fas fa-times-circle'" class="mr-1"></i>
-                                                <span x-text="verificationResult.videoMatch ? 'DETECTADO' : 'NO DETECTADO'"></span>
-                                            </span>
+                                            <div class="text-right">
+                                                <span :class="getStatusClass(step2Result?.recommendation)" 
+                                                      class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium">
+                                                    <i :class="getStatusIcon(step2Result?.recommendation)" class="mr-1"></i>
+                                                    <span x-text="getStatusText(step2Result?.recommendation)"></span>
+                                                </span>
+                                                <div class="text-lg font-bold mt-1" 
+                                                     :class="getConfidenceClass(step2Result?.confidence)" 
+                                                     x-text="`${step2Result?.confidence || 0}%`"></div>
+                                            </div>
                                         </div>
-                                        <div x-show="!verificationResult.videoMatch" class="mt-2 text-sm text-red-600">
-                                            ⚠️ No se detectó la persona del selfie en el video de verificación
+                                        
+                                        <!-- Selfie Analysis Details -->
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                            <div class="space-y-2">
+                                                <h6 class="text-sm font-semibold text-gray-700">Análisis Facial:</h6>
+                                                <div class="text-sm space-y-1">
+                                                    <div class="flex justify-between">
+                                                        <span class="text-gray-600">Cara detectada en DNI:</span>
+                                                        <span :class="step2Result?.face_detected_dni !== false ? 'text-green-600' : 'text-red-600'" class="font-medium flex items-center">
+                                                            <i :class="step2Result?.face_detected_dni !== false ? 'fas fa-check' : 'fas fa-times'" class="mr-1"></i>
+                                                            <span x-text="step2Result?.face_detected_dni !== false ? 'SÍ' : 'NO'"></span>
+                                                        </span>
+                                                    </div>
+                                                    <div class="flex justify-between">
+                                                        <span class="text-gray-600">Cara detectada en Selfie:</span>
+                                                        <span :class="step2Result?.face_detected_selfie !== false ? 'text-green-600' : 'text-red-600'" class="font-medium flex items-center">
+                                                            <i :class="step2Result?.face_detected_selfie !== false ? 'fas fa-check' : 'fas fa-times'" class="mr-1"></i>
+                                                            <span x-text="step2Result?.face_detected_selfie !== false ? 'SÍ' : 'NO'"></span>
+                                                        </span>
+                                                    </div>
+                                                    <div class="flex justify-between">
+                                                        <span class="text-gray-600">Coincidencia facial:</span>
+                                                        <span :class="step2Result?.face_match ? 'text-green-600' : 'text-red-600'" class="font-medium flex items-center">
+                                                            <i :class="step2Result?.face_match ? 'fas fa-check-circle' : 'fas fa-times-circle'" class="mr-1"></i>
+                                                            <span x-text="step2Result?.face_match ? 'COINCIDE' : 'NO COINCIDE'"></span>
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="space-y-2">
+                                                <h6 class="text-sm font-semibold text-gray-700">Calidad de Imágenes:</h6>
+                                                <div x-show="step2Result?.quality_analysis" class="text-sm space-y-1">
+                                                    <div class="flex justify-between">
+                                                        <span class="text-gray-600">Calidad DNI:</span>
+                                                        <span class="font-medium" x-text="`${step2Result?.quality_analysis?.dni_quality || 0}%`"></span>
+                                                    </div>
+                                                    <div class="flex justify-between">
+                                                        <span class="text-gray-600">Calidad Selfie:</span>
+                                                        <span class="font-medium" x-text="`${step2Result?.quality_analysis?.selfie_quality || 0}%`"></span>
+                                                    </div>
+                                                    <div class="flex justify-between">
+                                                        <span class="text-gray-600">Brillo/Contraste:</span>
+                                                        <span class="font-medium" x-text="step2Result?.quality_analysis?.lighting_ok ? 'Bueno' : 'Regular'"></span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Detailed Analysis Message -->
+                                        <div x-show="step2Result?.analysis" class="mt-4 p-3 bg-gray-50 rounded-lg">
+                                            <p class="text-sm text-gray-700" x-text="step2Result?.analysis"></p>
+                                        </div>
+                                        
+                                        <!-- Fraud Indicators (if any) -->
+                                        <div x-show="step2Result?.fraud_indicators && step2Result.fraud_indicators.length > 0" class="mt-4 p-3 bg-red-50 rounded-lg border border-red-200">
+                                            <h6 class="text-sm font-semibold text-red-800 mb-2">⚠️ Indicadores de Fraude Detectados:</h6>
+                                            <ul class="text-sm text-red-700 space-y-1">
+                                                <template x-for="indicator in step2Result.fraud_indicators" :key="indicator">
+                                                    <li class="flex items-center">
+                                                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                                                        <span x-text="indicator"></span>
+                                                    </li>
+                                                </template>
+                                            </ul>
+                                        </div>
+                                    </div>
+
+                                    <!-- Liveness Detection Results -->
+                                    <div class="p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+                                        <div class="flex justify-between items-start mb-3">
+                                            <div>
+                                                <h5 class="font-medium text-gray-800 flex items-center">
+                                                    <i class="fas fa-video text-purple-600 mr-2"></i>
+                                                    🎬 Verificación de Vida: Selfie vs Video (Paso 3)
+                                                </h5>
+                                                <p class="text-sm text-gray-600">Análisis de vida real mediante detección en video</p>
+                                            </div>
+                                            <div class="text-right">
+                                                <span :class="getStatusClass(step3Result?.recommendation)" 
+                                                      class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium">
+                                                    <i :class="getStatusIcon(step3Result?.recommendation)" class="mr-1"></i>
+                                                    <span x-text="getStatusText(step3Result?.recommendation)"></span>
+                                                </span>
+                                                <div class="text-lg font-bold mt-1" 
+                                                     :class="getConfidenceClass(step3Result?.confidence)" 
+                                                     x-text="`${step3Result?.confidence || 0}%`"></div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Liveness Analysis Details -->
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                            <div class="space-y-2">
+                                                <h6 class="text-sm font-semibold text-gray-700">Detección de Vida:</h6>
+                                                <div class="text-sm space-y-1">
+                                                    <div class="flex justify-between">
+                                                        <span class="text-gray-600">Persona real detectada:</span>
+                                                        <span :class="step3Result?.is_live_person ? 'text-green-600' : 'text-red-600'" class="font-medium flex items-center">
+                                                            <i :class="step3Result?.is_live_person ? 'fas fa-check-circle' : 'fas fa-times-circle'" class="mr-1"></i>
+                                                            <span x-text="step3Result?.is_live_person ? 'SÍ' : 'NO'"></span>
+                                                        </span>
+                                                    </div>
+                                                    <div class="flex justify-between">
+                                                        <span class="text-gray-600">Coincide con Selfie:</span>
+                                                        <span :class="step3Result?.matches_selfie ? 'text-green-600' : 'text-red-600'" class="font-medium flex items-center">
+                                                            <i :class="step3Result?.matches_selfie ? 'fas fa-check' : 'fas fa-times'" class="mr-1"></i>
+                                                            <span x-text="step3Result?.matches_selfie ? 'COINCIDE' : 'NO COINCIDE'"></span>
+                                                        </span>
+                                                    </div>
+                                                    <div x-show="step3Result?.matches_dni !== undefined" class="flex justify-between">
+                                                        <span class="text-gray-600">Coincide con DNI:</span>
+                                                        <span :class="step3Result?.matches_dni ? 'text-green-600' : 'text-orange-600'" class="font-medium flex items-center">
+                                                            <i :class="step3Result?.matches_dni ? 'fas fa-check' : 'fas fa-exclamation-triangle'" class="mr-1"></i>
+                                                            <span x-text="step3Result?.matches_dni ? 'COINCIDE' : 'PARCIAL'"></span>
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="space-y-2">
+                                                <h6 class="text-sm font-semibold text-gray-700">Análisis Técnico:</h6>
+                                                <div x-show="step3Result?.technical_details" class="text-sm space-y-1">
+                                                    <div class="flex justify-between">
+                                                        <span class="text-gray-600">Frames analizados:</span>
+                                                        <span class="font-medium" x-text="step3Result?.frames_analyzed || 0"></span>
+                                                    </div>
+                                                    <div x-show="step3Result?.technical_details?.frames_with_faces" class="flex justify-between">
+                                                        <span class="text-gray-600">Frames con caras:</span>
+                                                        <span class="font-medium" x-text="step3Result?.technical_details?.frames_with_faces || 0"></span>
+                                                    </div>
+                                                    <div x-show="step3Result?.technical_details?.detection_rate" class="flex justify-between">
+                                                        <span class="text-gray-600">Tasa de detección:</span>
+                                                        <span class="font-medium" x-text="`${step3Result?.technical_details?.detection_rate || 0}%`"></span>
+                                                    </div>
+                                                    <div x-show="step3Result?.technical_details?.avg_confidence" class="flex justify-between">
+                                                        <span class="text-gray-600">Confianza promedio:</span>
+                                                        <span class="font-medium" x-text="`${Math.round(step3Result?.technical_details?.avg_confidence || 0)}%`"></span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Detailed Analysis Message -->
+                                        <div x-show="step3Result?.analysis" class="mt-4 p-3 bg-gray-50 rounded-lg">
+                                            <p class="text-sm text-gray-700" x-text="step3Result?.analysis"></p>
+                                        </div>
+                                        
+                                        <!-- Video Processing Info -->
+                                        <div x-show="step3Result?.technical_details?.fallback_method" class="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                            <h6 class="text-sm font-semibold text-blue-800 mb-2">ℹ️ Método de Procesamiento:</h6>
+                                            <div class="text-sm text-blue-700 space-y-1">
+                                                <div class="flex justify-between">
+                                                    <span>Método usado:</span>
+                                                    <span class="font-medium" x-text="getProcessingMethodText(step3Result?.technical_details?.fallback_method)"></span>
+                                                </div>
+                                                <div x-show="step3Result?.technical_details?.video_size_mb" class="flex justify-between">
+                                                    <span>Tamaño del video:</span>
+                                                    <span class="font-medium" x-text="`${step3Result?.technical_details?.video_size_mb} MB`"></span>
+                                                </div>
+                                                <div x-show="step3Result?.technical_details?.duration_seconds" class="flex justify-between">
+                                                    <span>Duración:</span>
+                                                    <span class="font-medium" x-text="`${step3Result?.technical_details?.duration_seconds}s`"></span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -944,12 +934,45 @@
                                 </div>
 
                                 <!-- Summary -->
-                                <div class="mt-4 p-3 rounded-lg" :class="verificationResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
-                                    <div class="flex items-center">
-                                        <i :class="verificationResult.success ? 'fas fa-shield-check' : 'fas fa-shield-times'" class="mr-2"></i>
-                                        <strong x-text="verificationResult.success ? 'VERIFICACIÓN EXITOSA' : 'VERIFICACIÓN FALLIDA'"></strong>
+                                <div class="mt-6 p-4 rounded-lg border-2" :class="verificationResult.success ? 'bg-green-50 text-green-800 border-green-200' : 'bg-red-50 text-red-800 border-red-200'">
+                                    <div class="flex items-center justify-between mb-4">
+                                        <div class="flex items-center">
+                                            <i :class="verificationResult.success ? 'fas fa-shield-check' : 'fas fa-shield-times'" class="text-2xl mr-3"></i>
+                                            <div>
+                                                <h4 class="text-lg font-bold" x-text="verificationResult.success ? 'VERIFICACIÓN EXITOSA' : 'VERIFICACIÓN FALLIDA'"></h4>
+                                                <p class="text-sm opacity-90" x-text="verificationResult.message"></p>
+                                            </div>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="text-3xl font-bold" x-text="`${verificationResult.overallConfidence || 0}%`"></div>
+                                            <div class="text-xs opacity-75">Confianza General</div>
+                                        </div>
                                     </div>
-                                    <p class="text-sm mt-1" x-text="verificationResult.message"></p>
+                                    
+                                    <!-- Resumen de pasos -->
+                                    <div class="grid grid-cols-3 gap-4 mt-4">
+                                        <div class="text-center p-3 bg-white bg-opacity-50 rounded-lg">
+                                            <div class="text-lg font-bold mb-1" :class="getConfidenceClass(step1Result?.confidence)" x-text="`${step1Result?.confidence || 0}%`"></div>
+                                            <div class="text-xs opacity-75">📄 Documento</div>
+                                            <div class="text-sm font-medium" x-text="getStatusText(step1Result?.recommendation)"></div>
+                                        </div>
+                                        <div class="text-center p-3 bg-white bg-opacity-50 rounded-lg">
+                                            <div class="text-lg font-bold mb-1" :class="getConfidenceClass(step2Result?.confidence)" x-text="`${step2Result?.confidence || 0}%`"></div>
+                                            <div class="text-xs opacity-75">🤳 Selfie</div>
+                                            <div class="text-sm font-medium" x-text="getStatusText(step2Result?.recommendation)"></div>
+                                        </div>
+                                        <div class="text-center p-3 bg-white bg-opacity-50 rounded-lg">
+                                            <div class="text-lg font-bold mb-1" :class="getConfidenceClass(step3Result?.confidence)" x-text="`${step3Result?.confidence || 0}%`"></div>
+                                            <div class="text-xs opacity-75">🎬 Video</div>
+                                            <div class="text-sm font-medium" x-text="getStatusText(step3Result?.recommendation)"></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Explicación del resultado -->
+                                    <div class="mt-4 p-3 bg-white bg-opacity-30 rounded-lg">
+                                        <h6 class="font-semibold mb-2">💡 Explicación del Resultado:</h6>
+                                        <p class="text-sm" x-text="generateResultExplanation()"></p>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1040,7 +1063,7 @@
                     requiredFrames: 15 // frames estables requeridos
                 },
                 
-                // Step 3 Data
+                // Step 3 Data - SIMPLIFICADO
                 videoActive: false,
                 recording: false,
                 recordingTime: '00:00',
@@ -1048,180 +1071,18 @@
                 mediaRecorder: null,
                 recordingTimer: null,
                 
-                // Liveness Detection Data
-                currentInstruction: null,
-                instructionProgress: 0,
-                instructionTimer: null,
-                livenessInstructions: [
-                    { 
-                        icon: '👀', 
-                        title: 'Mire a la cámara', 
-                        description: 'Mantenga su rostro centrado',
-                        type: 'lookAtCamera',
-                        duration: 2000,
-                        attempts: 0,
-                        maxTime: 10000,
-                        validationThreshold: 80
-                    },
-                    { 
-                        icon: '🔄', 
-                        title: 'Gire la cabeza despacio', 
-                        description: 'Movimiento circular lento - gire a ambos lados',
-                        type: 'headTurn',
-                        duration: 4000,
-                        attempts: 0,
-                        maxTime: 15000,
-                        validationThreshold: 60,
-                        requiredAngle: 30
-                    },
-                    { 
-                        icon: '↕️', 
-                        title: 'Mueva la cabeza arriba y abajo', 
-                        description: 'Asiente despacio - arriba y abajo',
-                        type: 'headNod',
-                        duration: 3000,
-                        attempts: 0,
-                        maxTime: 12000,
-                        validationThreshold: 60,
-                        requiredMovement: 15
-                    },
-                    { 
-                        icon: '↔️', 
-                        title: 'Mueva la cabeza izquierda y derecha', 
-                        description: 'Niegue despacio - izquierda y derecha',
-                        type: 'headShake',
-                        duration: 3000,
-                        attempts: 0,
-                        maxTime: 12000,
-                        validationThreshold: 60,
-                        requiredMovement: 20
-                    },
-                    { 
-                        icon: '😊', 
-                        title: 'Sonría naturalmente', 
-                        description: 'Sonrisa clara y manténgala por 2 segundos',
-                        type: 'smile',
-                        duration: 2000,
-                        attempts: 0,
-                        maxTime: 10000,
-                        validationThreshold: 70,
-                        requiredDuration: 2000
-                    },
-                    { 
-                        icon: '👁️', 
-                        title: 'Parpadee 3 veces', 
-                        description: 'Parpadeos lentos y claros',
-                        type: 'blink',
-                        duration: 3000,
-                        attempts: 0,
-                        maxTime: 12000,
-                        validationThreshold: 100,
-                        requiredBlinks: 3
-                    }
+                // Sistema simple de instrucciones
+                simpleInstructions: [
+                    { icon: '👀', message: 'Mire directamente a la cámara' },
+                    { icon: '↔️', message: 'Gire la cabeza lentamente a izquierda y derecha' },
+                    { icon: '😊', message: 'Sonría de forma natural' }
                 ],
                 currentInstructionIndex: 0,
-                
-                // NUEVO: Sistema de detección facial con múltiples fallbacks
-                faceMesh: null,
-                faceDetector: null, // TensorFlow detector
-                faceDetectionActive: false,
-                faceDetectionInterval: null,
-                currentFaceData: null,
-                previousFaceData: null,
-                faceHistory: [],
-                detectionMode: 'real', // 'real', 'basic'
-                
-                // NUEVO: Datos para detección REAL
-                baselineFaceData: null, // Posición base del rostro
-                movementThresholds: {
-                    horizontal: 10, // Reducido para mayor sensibilidad
-                    vertical: 8,    // Reducido para mayor sensibilidad
-                    smile: 5,       // Reducido para detectar sonrisas más sutiles
-                    blink: 15       // Reducido para detectar parpadeos más fácil
-                },
-                
-                // Estados de validación por instrucción - NUEVOS TIEMPOS MÍNIMOS 5 SEGUNDOS
-                instructionValidation: {
-                    lookAtCamera: { 
-                        completed: false, 
-                        progress: 0, 
-                        centeringScore: 0,
-                        isDetecting: false,
-                        lastDetection: Date.now(),
-                        movementStart: null,
-                        requiredDuration: 5000,    // ⭐ 5 SEGUNDOS MÍNIMO mirando al centro
-                        validationPassed: false,   // Nueva validación estricta
-                        timeValidating: 0          // Tiempo acumulado validando correctamente
-                    },
-                    headTurn: { 
-                        completed: false, 
-                        progress: 0, 
-                        leftAngle: 0, 
-                        rightAngle: 0, 
-                        maxAngle: 0,
-                        isDetecting: false,
-                        lastDetection: Date.now(),
-                        movementStart: null,
-                        requiredDuration: 5000,    // ⭐ 5 SEGUNDOS MÍNIMO para girar izquierda y derecha
-                        validationPassed: false,
-                        timeValidating: 0
-                    },
-                    headNod: { 
-                        completed: false, 
-                        progress: 0, 
-                        upMovement: 0, 
-                        downMovement: 0, 
-                        totalMovement: 0,
-                        isDetecting: false,
-                        lastDetection: Date.now(),
-                        movementStart: null,
-                        requiredDuration: 5000,    // ⭐ 5 SEGUNDOS MÍNIMO para asentir
-                        validationPassed: false,
-                        timeValidating: 0
-                    },
-                    headShake: { 
-                        completed: false, 
-                        progress: 0, 
-                        leftMovement: 0, 
-                        rightMovement: 0, 
-                        totalMovement: 0,
-                        isDetecting: false,
-                        lastDetection: Date.now(),
-                        movementStart: null,
-                        requiredDuration: 5000,    // ⭐ 5 SEGUNDOS MÍNIMO para negar
-                        validationPassed: false,
-                        timeValidating: 0
-                    },
-                    smile: { 
-                        completed: false, 
-                        progress: 0, 
-                        smileDetected: false, 
-                        smileDuration: 0,
-                        isDetecting: false,
-                        lastDetection: Date.now(),
-                        movementStart: null,
-                        requiredDuration: 5000,    // ⭐ 5 SEGUNDOS MÍNIMO sonriendo
-                        validationPassed: false,
-                        timeValidating: 0
-                    },
-                    blink: { 
-                        completed: false, 
-                        progress: 0, 
-                        blinkCount: 0, 
-                        isBlinking: false, 
-                        lastBlink: 0,
-                        isDetecting: false,
-                        lastDetection: Date.now(),
-                        movementStart: null,
-                        requiredDuration: 5000,    // ⭐ 5 SEGUNDOS MÍNIMO para parpadear varias veces
-                        validationPassed: false,
-                        timeValidating: 0
-                    }
-                },
-                
-                // Feedback en tiempo real
-                realTimeFeedback: 'Posicione su rostro en el marco',
-                instructionStartTime: null,
+                currentMessage: '',
+                currentIcon: '',
+                progress: 0,
+                timeRemaining: 5,
+                instructionTimer: null,
                 
                 // Step 4 Data
                 verifying: false,
@@ -1238,446 +1099,12 @@
                     dataExtracted: false,
                     dataComparison: null
                 },
-                
-                // NUEVO: Resultado específico de liveness con comparación video-selfie
-                livenessVerificationResult: {
-                    success: false,
-                    matches_selfie: false,
-                    matches_dni: false,
-                    confidence: 0,
-                    message: ''
-                },
-                
-                // NUEVO: Variables para tracking de rutas de archivos
-                dniPath: '',
-                selfiePath: '',
 
                 init() {
-                    console.log('KYC Verification initialized');
-                    // Inicializar MediaPipe Face Mesh cuando esté disponible
-                    this.initializeFaceMesh();
-                },
-
-                // NUEVO: Inicializar sistema de detección facial
-                async initializeFaceMesh() {
-                    console.log('🎯 Inicializando sistema de detección SIMPLIFICADO...');
-                    
-                    // Usar solo modo básico simulado para máxima compatibilidad
-                    this.detectionMode = 'basic';
-                    this.faceDetector = null;
-                    
-                    console.log('✅ Sistema básico inicializado - Sin dependencias externas');
+                    console.log('KYC Verification initialized - Sistema Simplificado');
                 },
 
 
-
-                // NUEVO: Sistema de detección REAL - No más simulación
-                simulateBasicFaceDetection() {
-                    if (!this.currentInstruction) {
-                        this.realTimeFeedback = 'Posicione su rostro en el marco';
-                        return;
-                    }
-                    
-                    // Usar análisis real del video en lugar de simulación
-                    const faceData = this.analyzeVideoFrame();
-                    
-                    if (faceData && faceData.faceDetected) {
-                        // Rostro detectado correctamente
-                        this.realTimeFeedback = `✅ Rostro detectado - ${this.currentInstruction.text}`;
-                        
-                        // El análisis real maneja la detección de movimientos
-                        if (this.recording && this.currentInstruction) {
-                            this.validateCurrentInstructionRealTime();
-                        }
-                    } else if (faceData && !faceData.faceDetected) {
-                        // Hay datos pero el rostro no es claro
-                        this.realTimeFeedback = '⚠️ Rostro poco claro - Mejore la iluminación o acérquese más';
-                        
-                        // Reset progreso gradualmente si no hay detección clara
-                        const validation = this.instructionValidation[this.currentInstruction.type];
-                        if (validation.progress > 0) {
-                            validation.progress = Math.max(0, validation.progress - 1);
-                            this.instructionProgress = validation.progress;
-                        }
-                    } else {
-                        // Sin datos faciales en absoluto - dar feedback
-                        this.realTimeFeedback = '❌ No se detecta rostro - Acérquese a la cámara';
-                        
-                        // Usar sistema de fallback básico si falla completamente
-                        this.fallbackToSimulation();
-                    }
-                },
-
-                // Sistema de fallback si la detección real falla
-                fallbackToSimulation() {
-                    if (!this.currentInstruction) return;
-                    
-                    const elapsed = Date.now() - (this.instructionStartTime || Date.now());
-                    const instructionDuration = this.currentInstruction.duration || 4000;
-                    
-                    // Permitir avance automático después de un tiempo en modo fallback
-                    if (elapsed > instructionDuration * 1.5) { // 1.5x el tiempo normal
-                        console.log('🔄 Usando modo fallback para avanzar');
-                        const validation = this.instructionValidation[this.currentInstruction.type];
-                        validation.completed = true;
-                        validation.progress = 100;
-                        this.completeCurrentInstruction();
-                    } else {
-                        // Mostrar progreso gradual en modo fallback
-                        const validation = this.instructionValidation[this.currentInstruction.type];
-                        const fallbackProgress = Math.min(100, (elapsed / (instructionDuration * 1.5)) * 100);
-                        validation.progress = Math.max(validation.progress, fallbackProgress * 0.7); // Progreso más lento
-                        this.instructionProgress = validation.progress;
-                    }
-                },
-
-                // NUEVO: Validar instrucción actual en tiempo real
-                validateCurrentInstructionRealTime() {
-                    if (!this.currentFaceData || !this.currentInstruction) return;
-                    
-                    const instruction = this.currentInstruction;
-                    const validation = this.instructionValidation[instruction.type];
-                    let progressUpdated = false;
-                    
-                    switch (instruction.type) {
-                        case 'lookAtCamera':
-                            progressUpdated = this.validateLookAtCamera(validation);
-                            break;
-                        case 'headTurn':
-                            progressUpdated = this.validateHeadTurn(validation);
-                            break;
-                        case 'headNod':
-                            progressUpdated = this.validateHeadNod(validation);
-                            break;
-                        case 'headShake':
-                            progressUpdated = this.validateHeadShake(validation);
-                            break;
-                        case 'smile':
-                            progressUpdated = this.validateSmile(validation);
-                            break;
-                        case 'blink':
-                            progressUpdated = this.validateBlink(validation);
-                            break;
-                    }
-                    
-                    // Actualizar progreso visual
-                    if (progressUpdated) {
-                        this.instructionProgress = validation.progress;
-                        this.updateRealTimeFeedback(validation, instruction.type);
-                        
-                        // Verificar si se completó la instrucción
-                        if (validation.completed && validation.progress >= instruction.validationThreshold) {
-                            this.completeCurrentInstruction();
-                        }
-                    }
-                    
-                    // Verificar timeout
-                    const elapsedTime = Date.now() - this.instructionStartTime;
-                    if (elapsedTime > instruction.maxTime && !validation.completed) {
-                        this.repeatCurrentInstruction('Tiempo agotado');
-                    }
-                },
-
-                // NUEVO: Validar "mirar a la cámara"
-                validateLookAtCamera(validation) {
-                    const rotation = this.currentFaceData.headRotation;
-                    
-                    // Verificar que está mirando al centro (±10 grados)
-                    const centeringScore = Math.max(0, 100 - Math.abs(rotation.horizontal * 2) - Math.abs(rotation.vertical * 2));
-                    validation.centeringScore = centeringScore;
-                    validation.progress = Math.min(100, centeringScore);
-                    validation.completed = centeringScore >= 80;
-                    
-                    return true;
-                },
-
-                // NUEVO: Validar giro de cabeza
-                validateHeadTurn(validation) {
-                    const rotation = this.currentFaceData.headRotation;
-                    const absHorizontal = Math.abs(rotation.horizontal);
-                    
-                    // Registrar máximo ángulo alcanzado
-                    if (absHorizontal > validation.maxAngle) {
-                        validation.maxAngle = absHorizontal;
-                    }
-                    
-                    // Registrar movimientos a izquierda y derecha
-                    if (rotation.horizontal < -15) validation.leftAngle = Math.max(validation.leftAngle, Math.abs(rotation.horizontal));
-                    if (rotation.horizontal > 15) validation.rightAngle = Math.max(validation.rightAngle, Math.abs(rotation.horizontal));
-                    
-                    // Progreso basado en que haya girado a ambos lados
-                    const leftProgress = Math.min(100, (validation.leftAngle / this.currentInstruction.requiredAngle) * 50);
-                    const rightProgress = Math.min(100, (validation.rightAngle / this.currentInstruction.requiredAngle) * 50);
-                    
-                    validation.progress = leftProgress + rightProgress;
-                    validation.completed = validation.leftAngle >= this.currentInstruction.requiredAngle && 
-                                          validation.rightAngle >= this.currentInstruction.requiredAngle;
-                    
-                    return true;
-                },
-
-                // NUEVO: Validar movimiento vertical (asentir)
-                validateHeadNod(validation) {
-                    const rotation = this.currentFaceData.headRotation;
-                    const absVertical = Math.abs(rotation.vertical);
-                    
-                    // Registrar movimientos arriba y abajo
-                    if (rotation.vertical < -10) validation.upMovement = Math.max(validation.upMovement, Math.abs(rotation.vertical));
-                    if (rotation.vertical > 10) validation.downMovement = Math.max(validation.downMovement, Math.abs(rotation.vertical));
-                    
-                    validation.totalMovement = validation.upMovement + validation.downMovement;
-                    validation.progress = Math.min(100, (validation.totalMovement / (this.currentInstruction.requiredMovement * 2)) * 100);
-                    validation.completed = validation.upMovement >= this.currentInstruction.requiredMovement && 
-                                          validation.downMovement >= this.currentInstruction.requiredMovement;
-                    
-                    return true;
-                },
-
-                // NUEVO: Validar movimiento horizontal (negar)
-                validateHeadShake(validation) {
-                    const rotation = this.currentFaceData.headRotation;
-                    
-                    // Similar a headTurn pero para negación
-                    if (rotation.horizontal < -15) validation.leftMovement = Math.max(validation.leftMovement, Math.abs(rotation.horizontal));
-                    if (rotation.horizontal > 15) validation.rightMovement = Math.max(validation.rightMovement, Math.abs(rotation.horizontal));
-                    
-                    validation.totalMovement = validation.leftMovement + validation.rightMovement;
-                    validation.progress = Math.min(100, (validation.totalMovement / (this.currentInstruction.requiredMovement * 2)) * 100);
-                    validation.completed = validation.leftMovement >= this.currentInstruction.requiredMovement && 
-                                          validation.rightMovement >= this.currentInstruction.requiredMovement;
-                    
-                    return true;
-                },
-
-                // NUEVO: Validar sonrisa
-                validateSmile(validation) {
-                    const mouthRatio = this.currentFaceData.mouthAspectRatio;
-                    const isSmiling = mouthRatio > 3.5; // Threshold for smile detection
-                    
-                    if (isSmiling && !validation.smileDetected) {
-                        validation.smileDetected = true;
-                        validation.smileStartTime = Date.now();
-                    } else if (isSmiling && validation.smileDetected) {
-                        validation.smileDuration = Date.now() - validation.smileStartTime;
-                        validation.progress = Math.min(100, (validation.smileDuration / this.currentInstruction.requiredDuration) * 100);
-                        validation.completed = validation.smileDuration >= this.currentInstruction.requiredDuration;
-                    } else if (!isSmiling) {
-                        validation.smileDetected = false;
-                        validation.smileDuration = 0;
-                        validation.progress = 0;
-                    }
-                    
-                    return true;
-                },
-
-                // NUEVO: Validar parpadeo
-                validateBlink(validation) {
-                    const ear = this.currentFaceData.eyeAspectRatio;
-                    const isBlinking = ear < 0.25; // Threshold for blink detection
-                    const now = Date.now();
-                    
-                    if (isBlinking && !validation.isBlinking && (now - validation.lastBlink) > 300) {
-                        validation.blinkCount++;
-                        validation.isBlinking = true;
-                        validation.lastBlink = now;
-                    } else if (!isBlinking) {
-                        validation.isBlinking = false;
-                    }
-                    
-                    validation.progress = Math.min(100, (validation.blinkCount / this.currentInstruction.requiredBlinks) * 100);
-                    validation.completed = validation.blinkCount >= this.currentInstruction.requiredBlinks;
-                    
-                    return true;
-                },
-
-                getStepClass(step) {
-                    if (step < this.currentStep) return 'step-completed';
-                    if (step === this.currentStep) return 'step-active';
-                    return 'step-inactive';
-                },
-
-                // NUEVO: Obtener clase CSS del marco según progreso
-                getFrameColorClass() {
-                    if (!this.currentInstruction) return 'border-white';
-                    
-                    if (this.instructionProgress >= 80) {
-                        return 'border-green-400'; // Casi completado
-                    } else if (this.instructionProgress >= 40) {
-                        return 'border-yellow-400'; // En progreso
-                    } else {
-                        return 'border-red-400'; // Necesita más esfuerzo
-                    }
-                },
-
-                // NUEVO: Obtener clase CSS del texto de feedback
-                getFeedbackTextClass() {
-                    if (!this.currentInstruction) return 'text-white';
-                    
-                    if (this.instructionProgress >= 80) {
-                        return 'text-green-300';
-                    } else if (this.instructionProgress >= 40) {
-                        return 'text-yellow-300';
-                    } else {
-                        return 'text-red-300';
-                    }
-                },
-
-                // NUEVO: Actualizar feedback en tiempo real - MEJORADO
-                updateRealTimeFeedback(validation, instructionType) {
-                    const attempts = this.currentInstruction?.attempts || 0;
-                    const isEasy = attempts >= 2; // Después de 2 intentos se vuelve más fácil
-                    
-                    switch (instructionType) {
-                        case 'lookAtCamera':
-                            if (validation.centeringScore >= 80) {
-                                this.realTimeFeedback = '✅ ¡Perfecto! Mantén la posición';
-                            } else if (validation.centeringScore >= 50) {
-                                this.realTimeFeedback = '🔄 Ajusta ligeramente hacia el centro';
-                            } else {
-                                this.realTimeFeedback = isEasy ? '👁️ Solo mira a la cámara' : '❌ Mira directamente a la cámara';
-                            }
-                            break;
-                            
-                        case 'headTurn':
-                            if (validation.completed) {
-                                this.realTimeFeedback = '✅ ¡Excelente! Giro completado';
-                            } else if (validation.progress > 50) {
-                                this.realTimeFeedback = '🔄 ¡Bien! Continúa girando despacio';
-                            } else if (validation.progress > 20) {
-                                this.realTimeFeedback = '↔️ Gira más hacia ambos lados';
-                            } else {
-                                this.realTimeFeedback = isEasy ? '🔄 Mueve la cabeza a los lados' : '🔄 Comienza girando despacio hacia un lado';
-                            }
-                            break;
-                            
-                        case 'headNod':
-                            if (validation.completed) {
-                                this.realTimeFeedback = '✅ ¡Perfecto! Movimiento completado';
-                            } else if (validation.progress > 50) {
-                                this.realTimeFeedback = '↕️ ¡Bien! Continúa arriba y abajo';
-                            } else {
-                                this.realTimeFeedback = isEasy ? '👍 Asiente con la cabeza' : '↕️ Mueve la cabeza arriba y abajo despacio';
-                            }
-                            break;
-                            
-                        case 'headShake':
-                            if (validation.completed) {
-                                this.realTimeFeedback = '✅ ¡Excelente! Negación completada';
-                            } else if (validation.progress > 50) {
-                                this.realTimeFeedback = '↔️ ¡Bien! Continúa izquierda y derecha';
-                            } else {
-                                this.realTimeFeedback = isEasy ? '👎 Niega con la cabeza' : '↔️ Mueve la cabeza izquierda y derecha';
-                            }
-                            break;
-                            
-                        case 'smile':
-                            if (validation.completed) {
-                                this.realTimeFeedback = '✅ ¡Sonrisa perfecta mantenida!';
-                            } else if (validation.smileDetected) {
-                                const remaining = Math.ceil((this.currentInstruction.requiredDuration - validation.smileDuration) / 1000);
-                                this.realTimeFeedback = `😊 ¡Bien! Mantén ${remaining}s más`;
-                            } else {
-                                this.realTimeFeedback = isEasy ? '😊 Sonríe un poco' : '😊 Por favor, sonríe naturalmente';
-                            }
-                            break;
-                            
-                        case 'blink':
-                            if (validation.completed) {
-                                this.realTimeFeedback = '✅ ¡Perfecto! 3 parpadeos completados';
-                            } else {
-                                const remaining = this.currentInstruction.requiredBlinks - validation.blinkCount;
-                                const easy = isEasy ? (remaining <= 1 ? '👁️ Un parpadeo más' : '👁️ Parpadea despacio') : `👁️ Faltan ${remaining} parpadeos lentos`;
-                                this.realTimeFeedback = easy;
-                            }
-                            break;
-                            
-                        default:
-                            this.realTimeFeedback = isEasy ? '🎯 Sigue la instrucción' : 'Sigue las instrucciones';
-                    }
-                    
-                    // Añadir indicador de progreso si está en progreso
-                    if (validation.progress > 0 && validation.progress < 100) {
-                        this.realTimeFeedback += ` (${Math.round(validation.progress)}%)`;
-                    }
-                },
-
-                // Completar instrucción actual - redirigir a versión estricta
-                completeCurrentInstruction() {
-                    this.completeCurrentInstructionStrict();
-                },
-
-                // NUEVO: Repetir instrucción actual
-                repeatCurrentInstruction(reason = 'Inténtalo de nuevo') {
-                    console.log(`🔄 Repitiendo instrucción: ${this.currentInstruction.type} - ${reason}`);
-                    
-                    // Incrementar contador de intentos
-                    this.currentInstruction.attempts = (this.currentInstruction.attempts || 0) + 1;
-                    
-                    // Reset validación
-                    const validation = this.instructionValidation[this.currentInstruction.type];
-                    Object.keys(validation).forEach(key => {
-                        if (typeof validation[key] === 'number') {
-                            validation[key] = 0;
-                        } else if (typeof validation[key] === 'boolean') {
-                            validation[key] = false;
-                        }
-                    });
-                    
-                    // Hacer instrucción más fácil después de varios intentos
-                    if (this.currentInstruction.attempts >= 3) {
-                        this.currentInstruction.validationThreshold = Math.max(40, this.currentInstruction.validationThreshold - 20);
-                        this.currentInstruction.requiredAngle = Math.max(15, (this.currentInstruction.requiredAngle || 30) - 10);
-                        this.currentInstruction.requiredMovement = Math.max(8, (this.currentInstruction.requiredMovement || 15) - 5);
-                    }
-                    
-                    // Reiniciar progreso
-                    this.instructionProgress = 0;
-                    this.instructionStartTime = Date.now();
-                    this.realTimeFeedback = `${reason} - Intento ${this.currentInstruction.attempts + 1}`;
-                },
-
-                // NUEVO: Obtener pista de ayuda según intentos
-                getInstructionHint() {
-                    if (!this.currentInstruction) return '';
-                    
-                    const attempts = this.currentInstruction.attempts || 0;
-                    const type = this.currentInstruction.type;
-                    
-                    const hints = {
-                        lookAtCamera: [
-                            'Mira directamente a la lente',
-                            'Centra tu rostro en el marco',
-                            'Mantén la cabeza quieta'
-                        ],
-                        headTurn: [
-                            'Gira despacio hacia ambos lados',
-                            'Movimiento más amplio, como mirar por encima del hombro',
-                            'Gira al menos 30° hacia cada lado'
-                        ],
-                        headNod: [
-                            'Asiente despacio arriba y abajo',
-                            'Movimiento más pronunciado, como decir "sí"',
-                            'Baja y sube la barbilla claramente'
-                        ],
-                        headShake: [
-                            'Niega despacio izquierda y derecha',
-                            'Como decir "no" con la cabeza',
-                            'Movimiento horizontal más amplio'
-                        ],
-                        smile: [
-                            'Sonríe naturalmente durante 2 segundos',
-                            'Sonrisa más amplia y mantenida',
-                            'Muestra los dientes ligeramente'
-                        ],
-                        blink: [
-                            'Parpadea 3 veces despacio',
-                            'Parpadeos más lentos y marcados',
-                            'Cierra y abre los ojos completamente'
-                        ]
-                    };
-                    
-                    return hints[type] ? hints[type][Math.min(attempts, hints[type].length - 1)] : 'Sigue las instrucciones';
-                },
 
                 async nextStep() {
                     // PASO 1: Validar DNI automáticamente
@@ -1781,7 +1208,6 @@
                         // Guardar resultados del paso 1
                         this.step1Result = dniResult;
                         this.dniPhotoPath = dniResult.dni_front_path;
-                        this.dniPath = dniResult.dni_front_path; // Para la comparación final de liveness
                         
                         // Determinar si puede pasar al siguiente paso
                         this.dniValidationPassed = dniResult.success && 
@@ -1908,7 +1334,6 @@
                         
                         // Guardar resultados del paso 2
                         this.step2Result = selfieResult;
-                        this.selfiePath = selfieResult.selfie_path; // Para la comparación final de liveness
                         
                         // Determinar si puede pasar al siguiente paso (ACEPTA REVIEW también)
                         this.selfieVerificationPassed = selfieResult.success && 
@@ -1948,51 +1373,31 @@
                            this.selfieVerificationPassed; // NUEVO: requiere verificación exitosa del selfie
                 },
 
-                // Step 3 Functions
+                // Step 3 Functions - SIMPLIFICADO
                 async startVideoCamera() {
                     try {
-                        // Verificar si getUserMedia está disponible
-                        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                            throw new Error('Tu navegador no soporta acceso a la cámara. Usa Chrome, Firefox, Safari o Edge.');
-                        }
-
-                        // Verificar permisos de cámara
-                        const permissions = await navigator.permissions.query({ name: 'camera' });
-                        if (permissions.state === 'denied') {
-                            throw new Error('Permisos de cámara denegados. Habilita la cámara en la configuración del navegador.');
-                        }
-
-                        console.log('📹 Iniciando cámara para video...');
+                        console.log('📹 Iniciando cámara simple...');
                         const stream = await navigator.mediaDevices.getUserMedia({ 
                             video: { 
                                 width: { ideal: 640, min: 320 },
                                 height: { ideal: 480, min: 240 },
-                                facingMode: 'user' // Cámara frontal
+                                facingMode: 'user'
                             },
-                            audio: true
+                            audio: false // Sin audio para simplificar
                         });
                         
                         this.$refs.recordVideo.srcObject = stream;
                         this.videoActive = true;
-                        console.log('✅ Cámara de video iniciada correctamente');
+                        console.log('✅ Cámara simple iniciada correctamente');
                         
                     } catch (error) {
-                        console.error('❌ Error iniciando cámara de video:', error);
-                        
+                        console.error('❌ Error iniciando cámara:', error);
                         let errorMessage = 'No se pudo acceder a la cámara';
                         
                         if (error.name === 'NotAllowedError') {
                             errorMessage = 'Permisos de cámara denegados. Habilita la cámara en tu navegador.';
                         } else if (error.name === 'NotFoundError') {
                             errorMessage = 'No se encontró ninguna cámara conectada.';
-                        } else if (error.name === 'NotReadableError') {
-                            errorMessage = 'La cámara está siendo usada por otra aplicación.';
-                        } else if (error.name === 'OverconstrainedError') {
-                            errorMessage = 'La cámara no soporta la resolución solicitada.';
-                        } else if (error.name === 'SecurityError') {
-                            errorMessage = 'Acceso a la cámara bloqueado por seguridad. Usa HTTPS.';
-                        } else if (error.message.includes('HTTPS')) {
-                            errorMessage = 'Se requiere HTTPS para acceder a la cámara.';
                         }
                         
                         this.showError(errorMessage);
@@ -2000,69 +1405,97 @@
                     }
                 },
 
-                startLivenessRecording() {
+                // NUEVO: Sistema simple de grabación sin detección compleja
+                startRecording() {
+                    console.log('🎥 Iniciando grabación simple...');
+                    
                     const stream = this.$refs.recordVideo.srcObject;
-                    this.mediaRecorder = new MediaRecorder(stream);
+                    this.mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
                     const chunks = [];
                     
                     this.mediaRecorder.ondataavailable = (event) => {
-                        chunks.push(event.data);
+                        if (event.data.size > 0) chunks.push(event.data);
                     };
                     
                     this.mediaRecorder.onstop = () => {
+                        console.log('🎥 Grabación completada');
                         const blob = new Blob(chunks, { type: 'video/webm' });
                         this.recordedVideo = URL.createObjectURL(blob);
                     };
                     
+                    // Iniciar grabación y secuencia simple
                     this.mediaRecorder.start();
                     this.recording = true;
-                    this.currentInstructionIndex = 0;
                     this.startRecordingTimer();
-                    
-                    // NUEVO: Iniciar detección facial en tiempo real
-                    this.startFaceDetection();
-                    
-                    // NUEVO: Iniciar secuencia con detección inteligente
-                    this.startIntelligentLivenessSequence();
+                    this.startSimpleSequence();
                 },
 
-                // NUEVO: Iniciar detección facial en tiempo real
-                startFaceDetection() {
-                    this.faceDetectionActive = true;
-                    
-                    console.log('🎯 Iniciando sistema de detección REAL...');
-                    
-                    // Sistema REAL de análisis de video con Canvas
-                    this.faceDetectionInterval = setInterval(() => {
-                        if (this.faceDetectionActive) {
-                            this.simulateBasicFaceDetection(); // Ahora usa análisis real, no simulación
+                // NUEVO: Secuencia simple de 3 instrucciones sin detección
+                startSimpleSequence() {
+                    this.currentInstructionIndex = 0;
+                    this.runNextInstruction();
+                },
+
+                // NUEVO: Ejecutar siguiente instrucción simple
+                runNextInstruction() {
+                    if (this.currentInstructionIndex >= this.simpleInstructions.length) {
+                        // Completar grabación
+                        this.stopRecording();
+                        return;
+                    }
+
+                    const instruction = this.simpleInstructions[this.currentInstructionIndex];
+                    this.currentMessage = instruction.message;
+                    this.currentIcon = instruction.icon;
+                    this.progress = 0;
+                    this.timeRemaining = 5;
+
+                    console.log(`📋 Instrucción ${this.currentInstructionIndex + 1}: ${instruction.message}`);
+
+                    // Timer de 5 segundos por instrucción
+                    this.instructionTimer = setInterval(() => {
+                        this.timeRemaining -= 0.1;
+                        this.progress = ((5 - this.timeRemaining) / 5) * 100;
+
+                        if (this.timeRemaining <= 0) {
+                            clearInterval(this.instructionTimer);
+                            this.currentInstructionIndex++;
+                            
+                            // Pausa de 0.5 segundos entre instrucciones
+                            setTimeout(() => {
+                                this.runNextInstruction();
+                            }, 500);
                         }
-                    }, 200); // Más frecuente para mejor detección real (5 FPS)
+                    }, 100);
+                },
+
+                // NUEVO: Parar grabación simple
+                stopRecording() {
+                    console.log('🛑 Finalizando grabación simple...');
                     
-                    console.log('✅ Sistema de detección REAL iniciado - Analizando movimientos reales del usuario');
-                },
-
-                // NUEVO: Sistema básico de detección (ya no necesario)
-                startBasicFaceDetection() {
-                    console.log('🔄 Sistema básico siempre activo');
-                },
-
-                // NUEVO: Secuencia inteligente de liveness
-                startIntelligentLivenessSequence() {
-                    // Esperar 1 segundo antes de comenzar
-                    setTimeout(() => {
-                        this.startNextInstruction();
-                    }, 1000);
-                },
-
-                // NUEVO: Iniciar siguiente instrucción con sistema estricto
-                startNextInstruction() {
-                    this.startNextInstructionStrict();
-                },
-
-                async stopLivenessRecording() {
-                    // Redirigir a la nueva función que incluye comparación
-                    this.completeLivenessWithComparison();
+                    if (this.mediaRecorder && this.recording) {
+                        this.mediaRecorder.stop();
+                        this.recording = false;
+                        this.stopRecordingTimer();
+                        this.stopCamera(this.$refs.recordVideo);
+                        
+                        // Limpiar instrucciones
+                        this.currentMessage = '';
+                        this.currentIcon = '';
+                        this.progress = 0;
+                        
+                        if (this.instructionTimer) {
+                            clearInterval(this.instructionTimer);
+                            this.instructionTimer = null;
+                        }
+                        
+                        console.log('✅ Grabación simple completada');
+                        
+                        // Procesar automáticamente con backend
+                        setTimeout(async () => {
+                            await this.verifyLiveness();
+                        }, 1000);
+                    }
                 },
 
                 async verifyLiveness() {
@@ -2114,19 +1547,50 @@
                         // Guardar resultados del paso 3
                         this.step3Result = livenessResult;
                         
-                        // Determinar si puede pasar al siguiente paso
+                        // Determinar si puede pasar al siguiente paso (MÁS ESTRICTO)
                         this.livenessVerificationPassed = livenessResult.success && 
                                                           livenessResult.is_live_person && 
                                                           livenessResult.matches_selfie && 
-                                                          livenessResult.recommendation !== 'REJECT' && 
-                                                          livenessResult.confidence >= 60; // Umbral mínimo
+                                                          livenessResult.recommendation === 'APPROVE' &&  // SOLO APPROVE, no REVIEW
+                                                          livenessResult.confidence >= 70 &&  // Subido de 60% a 70%
+                                                          (!livenessResult.technical_details.detection_rate || 
+                                                           livenessResult.technical_details.detection_rate >= 70); // Al menos 70% de frames con caras
                         
                         if (this.livenessVerificationPassed) {
                             console.log('✅ Liveness verificado correctamente - puede continuar');
                             this.showSuccess('Video de vida verificado correctamente. Puede ver el resultado final.');
                         } else {
                             console.log('❌ Liveness no válido - no puede continuar');
-                            this.showError(`Video no verificado: ${livenessResult.recommendation}. Confianza: ${livenessResult.confidence}%`);
+                            
+                            // Mensaje de error más específico
+                            let errorMessage = `Video no válido: `;
+                            let reasons = [];
+                            
+                            if (!livenessResult.success) {
+                                reasons.push('Error en el procesamiento');
+                            }
+                            if (!livenessResult.is_live_person) {
+                                reasons.push('No se detectó persona real');
+                            }
+                            if (!livenessResult.matches_selfie) {
+                                reasons.push('No coincide con el selfie');
+                            }
+                            if (livenessResult.recommendation === 'REJECT') {
+                                reasons.push('Recomendación: RECHAZAR');
+                            } else if (livenessResult.recommendation === 'REVIEW') {
+                                reasons.push('Calidad insuficiente (requiere revisión)');
+                            }
+                            if (livenessResult.confidence < 70) {
+                                reasons.push(`Confianza muy baja (${livenessResult.confidence}% < 70%)`);
+                            }
+                            if (livenessResult.technical_details.detection_rate < 70) {
+                                reasons.push(`Pocas caras detectadas (${livenessResult.technical_details.detection_rate}% < 70%)`);
+                            }
+                            
+                            errorMessage += reasons.join(', ');
+                            errorMessage += '. Por favor, grabe nuevamente asegurándose de mantener su cara visible durante todo el video.';
+                            
+                            this.showError(errorMessage);
                         }
                         
                     } catch (error) {
@@ -2138,71 +1602,40 @@
                     }
                 },
 
+                // NUEVO: Función simple para repetir video
                 retakeVideo() {
-                    console.log('🔄 Reiniciando captura de video...');
+                    console.log('🔄 Reiniciando captura de video simple...');
                     
                     // Limpiar video y estados
                     this.recordedVideo = null;
                     this.livenessVerificationPassed = false;
                     this.step3Result = null;
+                    this.processing = false;
                     
-                    // Limpiar instrucciones y detección facial
-                    this.currentInstruction = null;
+                    // Limpiar instrucciones simples
+                    this.currentMessage = '';
+                    this.currentIcon = '';
+                    this.progress = 0;
                     this.currentInstructionIndex = 0;
-                    this.instructionProgress = 0;
-                    this.faceDetectionActive = false;
-                    this.currentFaceData = null;
-                    this.realTimeFeedback = 'Posicione su rostro en el marco';
                     
                     // Limpiar timers
                     if (this.instructionTimer) {
                         clearInterval(this.instructionTimer);
                         this.instructionTimer = null;
                     }
-                    if (this.faceDetectionInterval) {
-                        clearInterval(this.faceDetectionInterval);
-                        this.faceDetectionInterval = null;
-                    }
-                    
-                    // Reset validaciones de instrucciones
-                    Object.keys(this.instructionValidation).forEach(key => {
-                        const validation = this.instructionValidation[key];
-                        Object.keys(validation).forEach(prop => {
-                            if (typeof validation[prop] === 'number') {
-                                validation[prop] = 0;
-                            } else if (typeof validation[prop] === 'boolean') {
-                                validation[prop] = false;
-                            }
-                        });
-                    });
-                    
-                    // Reset intentos en instrucciones
-                    this.livenessInstructions.forEach(instruction => {
-                        instruction.attempts = 0;
-                        // Restaurar valores originales si fueron modificados
-                        instruction.validationThreshold = this.getOriginalValidationThreshold(instruction.type);
-                    });
                     
                     // Reiniciar cámara
                     this.startVideoCamera();
                 },
 
-                // NUEVO: Obtener threshold original de validación
-                getOriginalValidationThreshold(type) {
-                    const originalThresholds = {
-                        lookAtCamera: 80,
-                        headTurn: 60,
-                        headNod: 60,
-                        headShake: 60,
-                        smile: 70,
-                        blink: 100
-                    };
-                    return originalThresholds[type] || 60;
+                getStepClass(step) {
+                    if (step < this.currentStep) return 'step-completed';
+                    if (step === this.currentStep) return 'step-active';
+                    return 'step-inactive';
                 },
 
                 canProceedStep3() {
-                    return this.recordedVideo && 
-                           this.livenessVerificationPassed; // NUEVO: requiere verificación exitosa del video
+                    return this.recordedVideo && this.livenessVerificationPassed;
                 },
 
                 startRecordingTimer() {
@@ -2889,604 +2322,113 @@
                     return new Promise(resolve => setTimeout(resolve, ms));
                 },
 
-                // ================================
-                // FUNCIONES DE DETECCIÓN ESPECÍFICAS REALES
-                // ================================
-
-                // Analizar frame de video en tiempo real
-                analyzeVideoFrame() {
-                    if (!this.videoElement || this.videoElement.videoWidth === 0) {
-                        return null;
-                    }
-
-                    try {
-                        // Usar FaceDetectionUtils para análisis real
-                        const faceData = window.FaceDetectionUtils.detectFaceMovement(this.videoElement);
-                        
-                        if (faceData && faceData.faceDetected) {
-                            // Establecer datos base si es la primera detección
-                            if (!this.baselineFaceData) {
-                                this.baselineFaceData = { 
-                                    ...faceData,
-                                    timestamp: Date.now()
-                                };
-                                console.log('🎯 Baseline facial data establecido:', this.baselineFaceData);
-                            }
-                            
-                            // Detectar movimientos basados en la instrucción actual
-                            this.detectInstructionMovement(faceData);
-                            
-                            // Guardar datos para comparación
-                            this.previousFaceData = this.currentFaceData;
-                            this.currentFaceData = faceData;
-                            
-                            // Mantener historial de movimientos (reducido para mejor rendimiento)
-                            this.faceHistory.push({
-                                ...faceData,
-                                timestamp: Date.now()
-                            });
-                            if (this.faceHistory.length > 20) { // Reducido de 30 a 20
-                                this.faceHistory.shift();
-                            }
-                        } else if (faceData) {
-                            // Hay datos pero rostro no es claro - mantener referencia pero no procesar movimientos
-                            this.currentFaceData = faceData;
-                        }
-                        
-                        return faceData;
-                    } catch (error) {
-                        console.warn('Error analizando frame:', error);
-                        return null;
-                    }
-                },
-
-                // Detectar movimientos específicos según la instrucción actual - VALIDACIÓN MUY ESTRICTA
-                detectInstructionMovement(faceData) {
-                    if (!this.currentInstruction || !this.baselineFaceData) return;
-                    
-                    const instruction = this.currentInstruction;
-                    const validation = this.instructionValidation[instruction.type];
-                    const currentTime = Date.now();
-                    
-                    let movementDetected = false;
-                    let movementStrength = 0;
-                    let positioningCorrect = false; // Nueva variable para posicionamiento
-                    
-                    switch (instruction.type) {
-                        case 'lookAtCamera':
-                            const result1 = this.detectCenterGaze(faceData);
-                            movementDetected = result1.detected;
-                            movementStrength = result1.strength;
-                            positioningCorrect = result1.positioning; // Nuevo campo
-                            break;
-                            
-                        case 'headTurn':
-                            const result2 = this.detectHeadTurn(faceData);
-                            movementDetected = result2.detected;
-                            movementStrength = result2.strength;
-                            positioningCorrect = result2.positioning;
-                            break;
-                            
-                        case 'headNod':
-                            const result3 = this.detectHeadNod(faceData);
-                            movementDetected = result3.detected;
-                            movementStrength = result3.strength;
-                            positioningCorrect = result3.positioning;
-                            break;
-                            
-                        case 'headShake':
-                            const result4 = this.detectHeadShake(faceData);
-                            movementDetected = result4.detected;
-                            movementStrength = result4.strength;
-                            positioningCorrect = result4.positioning;
-                            break;
-                            
-                        case 'smile':
-                            const result5 = this.detectSmile(faceData);
-                            movementDetected = result5.detected;
-                            movementStrength = result5.strength;
-                            positioningCorrect = result5.positioning;
-                            break;
-                            
-                        case 'blink':
-                            const result6 = this.detectBlink(faceData);
-                            movementDetected = result6.detected;
-                            movementStrength = result6.strength;
-                            positioningCorrect = result6.positioning;
-                            break;
-                    }
-                    
-                    // ⭐ VALIDACIÓN MUY ESTRICTA: Solo cuenta si está bien posicionado Y hace el movimiento
-                    const validDetection = movementDetected && positioningCorrect && movementStrength > 0.6; // Umbral aún más alto
-                    
-                    if (validDetection) {
-                        // Inicializar detección si no está activa
-                        if (!validation.isDetecting) {
-                            validation.isDetecting = true;
-                            validation.movementStart = currentTime;
-                            validation.timeValidating = 0;
-                            validation.progress = 0; // Reset progreso al iniciar
-                            console.log(`🎯 ¡INICIANDO validación ESTRICTA: ${instruction.type}! (fuerza: ${movementStrength.toFixed(2)})`);
-                        }
-                        
-                        // ⭐ SOLO ACUMULAR TIEMPO SI LA DETECCIÓN ES VÁLIDA
-                        validation.lastDetection = currentTime;
-                        validation.timeValidating = currentTime - validation.movementStart;
-                        
-                        // Progreso SOLO basado en tiempo de validación REAL (sin bonus de fuerza)
-                        validation.progress = Math.min(100, (validation.timeValidating / validation.requiredDuration) * 100);
-                        
-                        // ⭐ COMPLETAR SOLO CUANDO SE ALCANCEN LOS 5 SEGUNDOS COMPLETOS DE DETECCIÓN VÁLIDA
-                        if (validation.timeValidating >= validation.requiredDuration && !validation.completed) {
-                            validation.validationPassed = true;
-                            validation.completed = true;
-                            validation.progress = 100;
-                            
-                            console.log(`✅ ¡COMPLETADO tras ${validation.timeValidating/1000}s de validación CONTINUA: ${instruction.type}!`);
-                            this.completeCurrentInstructionStrict();
-                            return; // Salir inmediatamente al completar
-                        }
-                        
-                        // Feedback positivo con tiempo restante
-                        const timeRemaining = Math.max(0, validation.requiredDuration - validation.timeValidating);
-                        this.updateRealTimeFeedbackStrict(instruction.type, validation.progress, movementStrength, timeRemaining);
-                        
-                    } else {
-                        // ⭐ REINICIO INMEDIATO si no hay detección válida
-                        if (validation.isDetecting) {
-                            console.log(`⚠️ REINICIO INMEDIATO ${instruction.type} - Posicionamiento: ${positioningCorrect}, Movimiento: ${movementDetected}, Fuerza: ${movementStrength.toFixed(2)}`);
-                            
-                            // RESET COMPLETO Y INMEDIATO
-                            validation.isDetecting = false;
-                            validation.movementStart = null;
-                            validation.timeValidating = 0;
-                            validation.progress = 0; // Reset completo a 0
-                            validation.validationPassed = false;
-                            
-                            // Feedback específico según el problema
-                            if (!positioningCorrect) {
-                                this.realTimeFeedback = `❌ Posiciónate correctamente - ${instruction.title}`;
-                            } else if (!movementDetected) {
-                                this.realTimeFeedback = `❌ Haz el movimiento - ${instruction.title}`;
-                            } else {
-                                this.realTimeFeedback = `❌ Movimiento más claro - ${instruction.title}`;
-                            }
-                        } else {
-                            // Feedback inicial si no está detectando
-                            this.realTimeFeedback = `🎯 Prepárate: ${instruction.title} durante 5 segundos`;
-                        }
-                    }
-                },
-
-                // Detectar mirada al centro - CON VALIDACIÓN DE POSICIONAMIENTO
-                detectCenterGaze(faceData) {
-                    const validation = this.instructionValidation.lookAtCamera;
-                    const centerScore = faceData.regions.center;
-                    const balance = Math.abs(faceData.regions.left - faceData.regions.right);
-                    const overallBrightness = faceData.brightness;
-                    
-                    // Validar posicionamiento: rostro visible y centrado
-                    const positioningCorrect = overallBrightness > 50 && centerScore > 60 && balance < 30;
-                    
-                    // Detectar mirada al centro: muy estricto
-                    const gazeDetected = centerScore > 90 && balance < 15 && overallBrightness > 70;
-                    
-                    validation.centeringScore = Math.max(validation.centeringScore, centerScore);
-                    
-                    return {
-                        detected: gazeDetected,
-                        strength: Math.min(1, centerScore / 100),
-                        positioning: positioningCorrect  // Nueva propiedad
-                    };
-                },
-
-                // Detectar giro de cabeza - CON VALIDACIÓN DE POSICIONAMIENTO
-                detectHeadTurn(faceData) {
-                    const validation = this.instructionValidation.headTurn;
-                    const horizontalMovement = faceData.movement.horizontal;
-                    const overallBrightness = faceData.brightness;
-                    
-                    // Validar posicionamiento: rostro visible
-                    const positioningCorrect = overallBrightness > 45 && faceData.regions.center > 50;
-                    
-                    // Detectar giros a izquierda y derecha
-                    if (horizontalMovement > this.movementThresholds.horizontal) {
-                        validation.rightAngle = Math.max(validation.rightAngle, horizontalMovement);
-                    } else if (horizontalMovement < -this.movementThresholds.horizontal) {
-                        validation.leftAngle = Math.max(validation.leftAngle, Math.abs(horizontalMovement));
-                    }
-                    
-                    validation.maxAngle = Math.max(validation.leftAngle, validation.rightAngle);
-                    
-                    // Se requiere movimiento significativo en ambas direcciones
-                    const bothDirections = validation.leftAngle > 20 && validation.rightAngle > 20; // Más estricto
-                    
-                    return {
-                        detected: bothDirections,
-                        strength: Math.min(1, validation.maxAngle / 35), // Más estricto
-                        positioning: positioningCorrect
-                    };
-                },
-
-                // Detectar asentir con la cabeza - CON VALIDACIÓN DE POSICIONAMIENTO
-                detectHeadNod(faceData) {
-                    const validation = this.instructionValidation.headNod;
-                    const verticalMovement = faceData.movement.vertical;
-                    const overallBrightness = faceData.brightness;
-                    
-                    // Validar posicionamiento: rostro visible
-                    const positioningCorrect = overallBrightness > 45 && faceData.regions.center > 50;
-                    
-                    // Detectar movimientos arriba y abajo
-                    if (verticalMovement > this.movementThresholds.vertical) {
-                        validation.downMovement = Math.max(validation.downMovement, verticalMovement);
-                    } else if (verticalMovement < -this.movementThresholds.vertical) {
-                        validation.upMovement = Math.max(validation.upMovement, Math.abs(verticalMovement));
-                    }
-                    
-                    validation.totalMovement = validation.upMovement + validation.downMovement;
-                    
-                    // Se requiere movimiento en ambas direcciones - más estricto
-                    const bothDirections = validation.upMovement > 12 && validation.downMovement > 12;
-                    
-                    return {
-                        detected: bothDirections,
-                        strength: Math.min(1, validation.totalMovement / 25),
-                        positioning: positioningCorrect
-                    };
-                },
-
-                // Detectar negar con la cabeza - CON VALIDACIÓN DE POSICIONAMIENTO
-                detectHeadShake(faceData) {
-                    const validation = this.instructionValidation.headShake;
-                    const horizontalMovement = faceData.movement.horizontal;
-                    const overallBrightness = faceData.brightness;
-                    
-                    // Validar posicionamiento: rostro visible
-                    const positioningCorrect = overallBrightness > 45 && faceData.regions.center > 50;
-                    
-                    // Similar a headTurn pero con movimiento rápido
-                    if (horizontalMovement > this.movementThresholds.horizontal) {
-                        validation.rightMovement = Math.max(validation.rightMovement, horizontalMovement);
-                    } else if (horizontalMovement < -this.movementThresholds.horizontal) {
-                        validation.leftMovement = Math.max(validation.leftMovement, Math.abs(horizontalMovement));
-                    }
-                    
-                    validation.totalMovement = validation.leftMovement + validation.rightMovement;
-                    
-                    // Requiere movimiento rápido en ambas direcciones - más estricto
-                    const rapidMovement = validation.leftMovement > 15 && validation.rightMovement > 15;
-                    
-                    return {
-                        detected: rapidMovement,
-                        strength: Math.min(1, validation.totalMovement / 30),
-                        positioning: positioningCorrect
-                    };
-                },
-
-                // Detectar sonrisa - CON VALIDACIÓN DE POSICIONAMIENTO
-                detectSmile(faceData) {
-                    const validation = this.instructionValidation.smile;
-                    const mouthBrightness = faceData.regions.mouth;
-                    const baselineMouth = this.baselineFaceData.regions.mouth;
-                    const overallBrightness = faceData.brightness;
-                    
-                    // Validar posicionamiento: rostro visible y centrado
-                    const positioningCorrect = overallBrightness > 50 && faceData.regions.center > 60;
-                    
-                    // Detectar cambio en zona de boca (sonrisa aumenta brillo) - más estricto
-                    const mouthChange = mouthBrightness - baselineMouth;
-                    
-                    if (mouthChange > this.movementThresholds.smile * 2) { // Más estricto
-                        validation.smileDetected = true;
-                        validation.smileDuration += 200; // Incrementar duración de sonrisa
-                    } else {
-                        validation.smileDetected = false;
-                    }
-                    
-                    return {
-                        detected: validation.smileDetected && validation.smileDuration > 1000, // Requiere sonrisa mantenida
-                        strength: Math.min(1, Math.max(0, mouthChange / 25)),
-                        positioning: positioningCorrect
-                    };
-                },
-
-                // Detectar parpadeo - CON VALIDACIÓN DE POSICIONAMIENTO
-                detectBlink(faceData) {
-                    const validation = this.instructionValidation.blink;
-                    const overallBrightness = faceData.brightness;
-                    const previousBrightness = this.previousFaceData ? this.previousFaceData.brightness : overallBrightness;
-                    
-                    // Validar posicionamiento: rostro visible
-                    const positioningCorrect = overallBrightness > 40 && faceData.regions.center > 50;
-                    
-                    // Detectar caída súbita en brillo (parpadeo) - más estricto
-                    const brightnessChange = previousBrightness - overallBrightness;
-                    
-                    if (brightnessChange > this.movementThresholds.blink * 1.5 && !validation.isBlinking) { // Más estricto
-                        validation.isBlinking = true;
-                        validation.blinkCount++;
-                        validation.lastBlink = Date.now();
-                        console.log(`👁️ Parpadeo detectado #${validation.blinkCount} (cambio: ${brightnessChange.toFixed(1)})`);
-                        
-                        // Reset estado de parpadeo después de 400ms
-                        setTimeout(() => {
-                            validation.isBlinking = false;
-                        }, 400);
-                    }
-                    
-                    return {
-                        detected: validation.blinkCount >= 3, // Requiere 3 parpadeos claros
-                        strength: Math.min(1, validation.blinkCount / 3),
-                        positioning: positioningCorrect
-                    };
-                },
-
-                // Actualizar feedback en tiempo real - NUEVA VERSIÓN ESTRICTA
-                updateRealTimeFeedbackStrict(instructionType, progress, strength, timeRemaining) {
-                    const secondsRemaining = Math.ceil(timeRemaining / 1000);
-                    const progressPercent = Math.round(progress);
-                    
-                    let baseMessage = '';
-                    let statusIcon = '';
-                    
-                    switch (instructionType) {
-                        case 'lookAtCamera':
-                            baseMessage = 'Mantén la mirada al centro';
-                            statusIcon = '👀';
-                            break;
-                        case 'headTurn':
-                            baseMessage = 'Girando cabeza correctamente';
-                            statusIcon = '🔄';
-                            break;
-                        case 'headNod':
-                            baseMessage = 'Asintiendo correctamente';
-                            statusIcon = '↕️';
-                            break;
-                        case 'headShake':
-                            baseMessage = 'Negando correctamente';
-                            statusIcon = '↔️';
-                            break;
-                        case 'smile':
-                            baseMessage = 'Manteniendo sonrisa';
-                            statusIcon = '😊';
-                            break;
-                        case 'blink':
-                            baseMessage = 'Parpadeando correctamente';
-                            statusIcon = '👁️';
-                            break;
+                // NUEVO: Funciones para formatear estados y colores en resultados
+                getStatusClass(recommendation) {
+                    switch(recommendation) {
+                        case 'APPROVE':
+                            return 'bg-green-100 text-green-800 border border-green-200';
+                        case 'REVIEW':
+                            return 'bg-yellow-100 text-yellow-800 border border-yellow-200';
+                        case 'REJECT':
+                            return 'bg-red-100 text-red-800 border border-red-200';
                         default:
-                            baseMessage = 'Movimiento detectado';
-                            statusIcon = '✅';
+                            return 'bg-gray-100 text-gray-800 border border-gray-200';
                     }
+                },
+
+                getStatusIcon(recommendation) {
+                    switch(recommendation) {
+                        case 'APPROVE':
+                            return 'fas fa-check-circle';
+                        case 'REVIEW':
+                            return 'fas fa-exclamation-triangle';
+                        case 'REJECT':
+                            return 'fas fa-times-circle';
+                        default:
+                            return 'fas fa-question-circle';
+                    }
+                },
+
+                getStatusText(recommendation) {
+                    switch(recommendation) {
+                        case 'APPROVE':
+                            return 'APROBADO';
+                        case 'REVIEW':
+                            return 'REVISIÓN';
+                        case 'REJECT':
+                            return 'DENEGADO';
+                        default:
+                            return 'PENDIENTE';
+                    }
+                },
+
+                getConfidenceClass(confidence) {
+                    if (!confidence) return 'text-gray-500';
+                    if (confidence >= 70) return 'text-green-600';
+                    if (confidence >= 50) return 'text-yellow-600';
+                    return 'text-red-600';
+                },
+
+                getProcessingMethodText(method) {
+                    switch(method) {
+                        case 'frame_analysis':
+                            return 'Análisis de frames extraídos';
+                        case 'size_and_duration_analysis':
+                            return 'Análisis por duración y tamaño';
+                        case 'size_only_analysis':
+                            return 'Análisis por tamaño únicamente';
+                        default:
+                            return 'Análisis estándar';
+                    }
+                },
+
+                generateResultExplanation() {
+                    const dni = this.step1Result;
+                    const selfie = this.step2Result;
+                    const liveness = this.step3Result;
                     
-                    // Mensaje con tiempo restante y progreso
-                    if (timeRemaining > 0) {
-                        this.realTimeFeedback = `${statusIcon} ${baseMessage} - ${secondsRemaining}s restantes (${progressPercent}%)`;
+                    let explanations = [];
+                    
+                    // Análisis del documento
+                    if (dni?.recommendation === 'APPROVE') {
+                        explanations.push(`✅ El documento es válido y todos los datos coinciden (${dni.confidence}%)`);
+                    } else if (dni?.recommendation === 'REVIEW') {
+                        explanations.push(`⚠️ El documento es válido pero algunos datos necesitan revisión (${dni.confidence}%)`);
                     } else {
-                        this.realTimeFeedback = `${statusIcon} ${baseMessage} - ¡Completando! (${progressPercent}%)`;
-                    }
-                },
-
-                // NUEVA: Completar instrucción con validación estricta
-                completeCurrentInstructionStrict() {
-                    const instruction = this.currentInstruction;
-                    const validation = this.instructionValidation[instruction.type];
-                    
-                    console.log(`✅ ¡INSTRUCCIÓN COMPLETADA EXITOSAMENTE!: ${instruction.type}`);
-                    console.log(`   - Tiempo validado: ${validation.timeValidating/1000}s`);
-                    console.log(`   - Progreso final: ${validation.progress}%`);
-                    
-                    // Mostrar mensaje de éxito con tiempo
-                    this.realTimeFeedback = `✅ ¡${instruction.title} completado! (${Math.round(validation.timeValidating/1000)}s)`;
-                    
-                    // Pausa de 2 segundos antes de continuar (para que el usuario vea el éxito)
-                    setTimeout(() => {
-                        this.currentInstructionIndex++;
-                        if (this.currentInstructionIndex >= this.livenessInstructions.length) {
-                            // Todas las instrucciones completadas - COMPARAR CON SELFIE
-                            this.completeLivenessWithComparison();
-                        } else {
-                            // Siguiente instrucción
-                            this.startNextInstructionStrict();
-                        }
-                    }, 2000);
-                },
-
-                // NUEVA: Iniciar siguiente instrucción con reset completo
-                startNextInstructionStrict() {
-                    if (this.currentInstructionIndex >= this.livenessInstructions.length) {
-                        this.completeLivenessWithComparison();
-                        return;
-                    }
-
-                    const instruction = this.livenessInstructions[this.currentInstructionIndex];
-                    this.currentInstruction = instruction;
-                    this.instructionProgress = 0;
-                    this.instructionStartTime = Date.now();
-                    
-                    // Reset COMPLETO de validación para esta instrucción
-                    const validation = this.instructionValidation[instruction.type];
-                    validation.completed = false;
-                    validation.progress = 0;
-                    validation.isDetecting = false;
-                    validation.lastDetection = Date.now();
-                    validation.movementStart = null;
-                    validation.validationPassed = false;
-                    validation.timeValidating = 0;
-                    
-                    // Reset específico por tipo de movimiento
-                    switch (instruction.type) {
-                        case 'lookAtCamera':
-                            validation.centeringScore = 0;
-                            break;
-                        case 'headTurn':
-                            validation.leftAngle = 0;
-                            validation.rightAngle = 0;
-                            validation.maxAngle = 0;
-                            break;
-                        case 'headNod':
-                            validation.upMovement = 0;
-                            validation.downMovement = 0;
-                            validation.totalMovement = 0;
-                            break;
-                        case 'headShake':
-                            validation.leftMovement = 0;
-                            validation.rightMovement = 0;
-                            validation.totalMovement = 0;
-                            break;
-                        case 'smile':
-                            validation.smileDetected = false;
-                            validation.smileDuration = 0;
-                            break;
-                        case 'blink':
-                            validation.blinkCount = 0;
-                            validation.isBlinking = false;
-                            validation.lastBlink = 0;
-                            break;
+                        explanations.push(`❌ El documento tiene problemas de validación (${dni?.confidence || 0}%)`);
                     }
                     
-                    // Feedback preparatorio
-                    this.realTimeFeedback = `🎯 Prepárate: ${instruction.title} durante 5 segundos`;
-                    
-                    console.log(`🎯 Nueva instrucción ESTRICTA iniciada: ${instruction.type} (requiere ${validation.requiredDuration/1000}s)`);
-                },
-
-                // NUEVA: Completar liveness con comparación final video-selfie
-                async completeLivenessWithComparison() {
-                    console.log('🎥 ¡Todas las instrucciones de liveness completadas! Iniciando comparación con selfie...');
-                    
-                    // Detener detección facial
-                    this.faceDetectionActive = false;
-                    if (this.faceDetectionInterval) {
-                        clearInterval(this.faceDetectionInterval);
-                        this.faceDetectionInterval = null;
-                    }
-                    
-                    // Limpiar instrucción actual
-                    this.currentInstruction = null;
-                    if (this.instructionTimer) {
-                        clearInterval(this.instructionTimer);
-                    }
-                    
-                    if (this.mediaRecorder && this.recording) {
-                        this.mediaRecorder.stop();
-                        this.recording = false;
-                        this.stopRecordingTimer();
-                        this.stopCamera(this.$refs.recordVideo);
-                        
-                        // Feedback de finalización
-                        this.realTimeFeedback = '✅ ¡Verificación de liveness completada! Comparando con selfie...';
-                        
-                        // ⭐ NUEVA FUNCIONALIDAD: Comparar automáticamente el video con el selfie
-                        setTimeout(() => {
-                            this.compareVideoWithSelfie();
-                        }, 2000);
-                        
+                    // Análisis del selfie
+                    if (selfie?.face_match && selfie?.recommendation === 'APPROVE') {
+                        explanations.push(`✅ La cara del selfie coincide perfectamente con el DNI (${selfie.confidence}%)`);
+                    } else if (selfie?.face_match && selfie?.recommendation === 'REVIEW') {
+                        explanations.push(`⚠️ La cara del selfie tiene similitud parcial con el DNI (${selfie.confidence}%)`);
                     } else {
-                        console.log('❌ No hay grabación de video para procesar');
-                        this.realTimeFeedback = '❌ Error: No se pudo completar la grabación de video';
+                        explanations.push(`❌ La cara del selfie no coincide con el DNI (${selfie?.confidence || 0}%)`);
                     }
-                },
-
-                // NUEVA: Comparar video de liveness con selfie automáticamente
-                async compareVideoWithSelfie() {
-                    try {
-                        console.log('🔍 Iniciando comparación automática video vs selfie...');
-                        this.realTimeFeedback = '🔍 Comparando video con selfie...';
-                        
-                        // Verificar que tenemos selfie y video
-                        if (!this.capturedSelfie) {
-                            console.log('❌ No hay selfie para comparar');
-                            this.realTimeFeedback = '❌ Error: No se encontró selfie para comparar';
-                            return;
-                        }
-                        
-                        if (!this.recordedVideo) {
-                            console.log('❌ No hay video para comparar');
-                            this.realTimeFeedback = '❌ Error: No se encontró video para comparar';
-                            return;
-                        }
-                        
-                        // Convertir video a File para envío
-                        const response = await fetch(this.recordedVideo);
-                        const videoBlob = await response.blob();
-                        const videoFile = new File([videoBlob], 'liveness_video.webm', { type: 'video/webm' });
-                        
-                        // Crear FormData para envío al endpoint
-                        const formData = new FormData();
-                        formData.append('verificationVideo', videoFile);
-                        formData.append('selfieImagePath', this.selfiePath); // Ruta del selfie guardado
-                        formData.append('dniImagePath', this.dniPath);       // Ruta del DNI guardado (si existe)
-                        
-                        console.log('📤 Enviando datos a /kyc/verify-liveness...');
-                        
-                        // Enviar al endpoint de verificación de liveness
-                        const verifyResponse = await fetch('/kyc/verify-liveness', {
-                            method: 'POST',
-                            body: formData
-                        });
-                        
-                        const result = await verifyResponse.json();
-                        console.log('📨 Resultado de comparación:', result);
-                        
-                        if (result.success) {
-                            // Mostrar resultado de la comparación
-                            const confidence = result.confidence || 0;
-                            const recommendation = result.recommendation || 'REVIEW';
-                            
-                            if (recommendation === 'APPROVE' && confidence >= 60) {
-                                this.realTimeFeedback = `✅ ¡Verificación exitosa! (${confidence}% confianza)`;
-                                this.livenessVerificationResult = {
-                                    success: true,
-                                    matches_selfie: result.matches_selfie,
-                                    matches_dni: result.matches_dni,
-                                    confidence: confidence,
-                                    message: `Persona verificada correctamente con ${confidence}% de confianza`
-                                };
-                            } else if (recommendation === 'REVIEW' && confidence >= 40) {
-                                this.realTimeFeedback = `⚠️ Verificación requiere revisión (${confidence}% confianza)`;
-                                this.livenessVerificationResult = {
-                                    success: false,
-                                    matches_selfie: result.matches_selfie,
-                                    matches_dni: result.matches_dni,
-                                    confidence: confidence,
-                                    message: `Verificación requiere revisión manual: ${confidence}% confianza`
-                                };
-                            } else {
-                                this.realTimeFeedback = `❌ Verificación fallida (${confidence}% confianza)`;
-                                this.livenessVerificationResult = {
-                                    success: false,
-                                    matches_selfie: result.matches_selfie,
-                                    matches_dni: result.matches_dni,
-                                    confidence: confidence,
-                                    message: `La persona del video no coincide con el selfie (${confidence}% confianza)`
-                                };
-                            }
-                        } else {
-                            this.realTimeFeedback = `❌ Error en verificación: ${result.error || 'Error desconocido'}`;
-                            this.livenessVerificationResult = {
-                                success: false,
-                                matches_selfie: false,
-                                matches_dni: false,
-                                confidence: 0,
-                                message: `Error técnico: ${result.error || 'No se pudo procesar el video'}`
-                            };
-                        }
-                        
-                        console.log('🎯 Resultado final de liveness:', this.livenessVerificationResult);
-                        
-                    } catch (error) {
-                        console.error('❌ Error en comparación video-selfie:', error);
-                        this.realTimeFeedback = '❌ Error técnico durante la comparación';
-                        this.livenessVerificationResult = {
-                            success: false,
-                            matches_selfie: false,
-                            matches_dni: false,
-                            confidence: 0,
-                            message: `Error técnico: ${error.message}`
-                        };
+                    
+                    // Análisis del video
+                    if (liveness?.is_live_person && liveness?.matches_selfie && liveness?.recommendation === 'APPROVE') {
+                        explanations.push(`✅ Se detectó persona real en el video que coincide con el selfie (${liveness.confidence}%)`);
+                    } else if (liveness?.is_live_person && liveness?.recommendation === 'REVIEW') {
+                        explanations.push(`⚠️ Se detectó persona real pero con coincidencia parcial (${liveness.confidence}%)`);
+                    } else {
+                        explanations.push(`❌ No se pudo verificar vida real o no coincide con el selfie (${liveness?.confidence || 0}%)`);
                     }
+                    
+                    // Conclusión
+                    const allApproved = dni?.recommendation === 'APPROVE' && selfie?.recommendation === 'APPROVE' && liveness?.recommendation === 'APPROVE';
+                    const hasReview = dni?.recommendation === 'REVIEW' || selfie?.recommendation === 'REVIEW' || liveness?.recommendation === 'REVIEW';
+                    
+                    if (allApproved) {
+                        explanations.push('🎉 Todos los pasos pasaron exitosamente. Verificación completa.');
+                    } else if (hasReview) {
+                        explanations.push('🔍 Algunos pasos requieren revisión manual por un operador.');
+                    } else {
+                        explanations.push('🚫 La verificación falló en uno o más pasos críticos.');
+                    }
+                    
+                    return explanations.join(' ');
                 }
             }
         }
