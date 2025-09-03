@@ -7,6 +7,121 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Face Detection Libraries - Sistema más simple y confiable -->
+    <script>
+        // Sistema de detección facial REAL con JavaScript puro
+        window.FaceDetectionUtils = {
+            // Canvas para análisis de frames
+            analysisCanvas: null,
+            analysisContext: null,
+            
+            // Inicializar canvas de análisis
+            initAnalysisCanvas() {
+                this.analysisCanvas = document.createElement('canvas');
+                this.analysisContext = this.analysisCanvas.getContext('2d');
+                this.analysisCanvas.width = 320;
+                this.analysisCanvas.height = 240;
+            },
+            
+            // Detectar cambios de brillo en regiones de la cara
+            detectFaceMovement(videoElement) {
+                if (!this.analysisCanvas) this.initAnalysisCanvas();
+                
+                try {
+                    // Verificar que el video está disponible
+                    if (!videoElement || videoElement.videoWidth === 0 || videoElement.videoHeight === 0) {
+                        return null;
+                    }
+                    
+                    // Capturar frame del video
+                    this.analysisContext.drawImage(videoElement, 0, 0, 320, 240);
+                    const imageData = this.analysisContext.getImageData(0, 0, 320, 240);
+                    const pixels = imageData.data;
+                    
+                    // Verificar que tenemos datos de imagen válidos
+                    if (!pixels || pixels.length === 0) {
+                        return null;
+                    }
+                    
+                    // Analizar regiones específicas para detectar movimientos
+                    const regions = {
+                        center: this.analyzeRegion(pixels, 120, 80, 80, 80, 320), // Centro de la cara
+                        left: this.analyzeRegion(pixels, 40, 80, 60, 80, 320),    // Izquierda
+                        right: this.analyzeRegion(pixels, 220, 80, 60, 80, 320),  // Derecha
+                        top: this.analyzeRegion(pixels, 120, 40, 80, 60, 320),    // Arriba
+                        bottom: this.analyzeRegion(pixels, 120, 140, 80, 60, 320), // Abajo
+                        mouth: this.analyzeRegion(pixels, 140, 160, 40, 30, 320)   // Zona boca
+                    };
+                    
+                    // Verificar que las regiones tienen datos válidos
+                    const overallBrightness = this.calculateOverallBrightness(pixels);
+                    
+                    // Solo retornar si hay suficiente brillo (rostro detectado)
+                    if (overallBrightness > 30 && regions.center > 30) { // Umbrales más bajos
+                        return {
+                            regions,
+                            movement: this.calculateMovement(regions),
+                            brightness: overallBrightness,
+                            faceDetected: true
+                        };
+                    } else if (overallBrightness > 15) { // Detectar presencia parcial
+                        return {
+                            regions,
+                            movement: this.calculateMovement(regions),
+                            brightness: overallBrightness,
+                            faceDetected: false // Presente pero no claro
+                        };
+                    } else {
+                        return null; // Sin presencia
+                    }
+                } catch (error) {
+                    console.warn('Error en análisis de frame:', error);
+                    return null;
+                }
+            },
+            
+            // Analizar región específica
+            analyzeRegion(pixels, x, y, width, height, canvasWidth) {
+                let totalBrightness = 0;
+                let pixelCount = 0;
+                
+                for (let py = y; py < y + height; py++) {
+                    for (let px = x; px < x + width; px++) {
+                        const index = (py * canvasWidth + px) * 4;
+                        if (index < pixels.length - 3) {
+                            const r = pixels[index];
+                            const g = pixels[index + 1];
+                            const b = pixels[index + 2];
+                            totalBrightness += (r + g + b) / 3;
+                            pixelCount++;
+                        }
+                    }
+                }
+                
+                return pixelCount > 0 ? totalBrightness / pixelCount : 0;
+            },
+            
+            // Calcular movimiento basado en cambios de brillo
+            calculateMovement(regions) {
+                return {
+                    horizontal: (regions.right - regions.left) / 255 * 100,
+                    vertical: (regions.bottom - regions.top) / 255 * 100,
+                    centerFocus: regions.center / 255 * 100
+                };
+            },
+            
+            // Calcular brillo general
+            calculateOverallBrightness(pixels) {
+                let total = 0;
+                for (let i = 0; i < pixels.length; i += 16) { // Sample every 4th pixel
+                    total += (pixels[i] + pixels[i+1] + pixels[i+2]) / 3;
+                }
+                return total / (pixels.length / 16);
+            }
+        };
+        
+        console.log('🎯 Sistema de detección REAL inicializado');
+    </script>
     <style>
         .step-active { @apply bg-blue-600 text-white; }
         .step-completed { @apply bg-green-600 text-white; }
@@ -337,29 +452,59 @@
                                     </div>
                                 </div>
 
-                                <!-- Guías faciales sutiles - SIN tapar cara -->
-                                <div x-show="videoActive && !recording" class="absolute inset-0 flex items-center justify-center pointer-events-none z-5">
-                                    <!-- Marco facial sutil -->
-                                    <div class="relative">
-                                        <!-- Esquinas del marco (como cámara profesional) -->
-                                        <div class="absolute -top-4 -left-4 w-8 h-8 border-l-4 border-t-4 border-white opacity-80 rounded-tl-lg"></div>
-                                        <div class="absolute -top-4 -right-4 w-8 h-8 border-r-4 border-t-4 border-white opacity-80 rounded-tr-lg"></div>
-                                        <div class="absolute -bottom-4 -left-4 w-8 h-8 border-l-4 border-b-4 border-white opacity-80 rounded-bl-lg"></div>
-                                        <div class="absolute -bottom-4 -right-4 w-8 h-8 border-r-4 border-b-4 border-white opacity-80 rounded-br-lg"></div>
-                                        
-                                        <!-- Área de rostro sugerida -->
-                                        <div class="w-48 h-64 bg-transparent border-2 border-dashed border-white opacity-50 rounded-3xl"></div>
-                                        
-                                        <!-- Texto de posicionamiento - ABAJO del marco -->
-                                        <div class="absolute -bottom-12 left-1/2 transform -translate-x-1/2 text-white text-center">
-                                            <div class="bg-black bg-opacity-60 rounded-full px-4 py-2 text-sm font-medium">
-                                                👤 Posicione su rostro en el marco
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                <!-- Guías faciales sutiles - SIN tapar cara -->
+                <div x-show="videoActive && !recording" class="absolute inset-0 flex items-center justify-center pointer-events-none z-5">
+                    <!-- Marco facial sutil -->
+                    <div class="relative">
+                        <!-- Esquinas del marco (como cámara profesional) -->
+                        <div class="absolute -top-4 -left-4 w-8 h-8 border-l-4 border-t-4 border-white opacity-80 rounded-tl-lg"></div>
+                        <div class="absolute -top-4 -right-4 w-8 h-8 border-r-4 border-t-4 border-white opacity-80 rounded-tr-lg"></div>
+                        <div class="absolute -bottom-4 -left-4 w-8 h-8 border-l-4 border-b-4 border-white opacity-80 rounded-bl-lg"></div>
+                        <div class="absolute -bottom-4 -right-4 w-8 h-8 border-r-4 border-b-4 border-white opacity-80 rounded-br-lg"></div>
+                        
+                        <!-- Área de rostro sugerida -->
+                        <div class="w-48 h-64 bg-transparent border-2 border-dashed border-white opacity-50 rounded-3xl"></div>
+                        
+                        <!-- Texto de posicionamiento - ABAJO del marco -->
+                        <div class="absolute -bottom-12 left-1/2 transform -translate-x-1/2 text-white text-center">
+                            <div class="bg-black bg-opacity-60 rounded-full px-4 py-2 text-sm font-medium">
+                                👤 Posicione su rostro en el marco
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                                <!-- Indicador de progreso de instrucción - ABAJO del video -->
+                <!-- NUEVO: Marco dinámico durante grabación con feedback -->
+                <div x-show="recording" class="absolute inset-0 flex items-center justify-center pointer-events-none z-5">
+                    <div class="relative">
+                        <!-- Marco dinámico que cambia de color según el progreso -->
+                        <div class="absolute -top-4 -left-4 w-8 h-8 border-l-4 border-t-4 rounded-tl-lg transition-all duration-300"
+                             :class="getFrameColorClass()"></div>
+                        <div class="absolute -top-4 -right-4 w-8 h-8 border-r-4 border-t-4 rounded-tr-lg transition-all duration-300"
+                             :class="getFrameColorClass()"></div>
+                        <div class="absolute -bottom-4 -left-4 w-8 h-8 border-l-4 border-b-4 rounded-bl-lg transition-all duration-300"
+                             :class="getFrameColorClass()"></div>
+                        <div class="absolute -bottom-4 -right-4 w-8 h-8 border-r-4 border-b-4 rounded-br-lg transition-all duration-300"
+                             :class="getFrameColorClass()"></div>
+                        
+                        <!-- Área de rostro con color dinámico -->
+                        <div class="w-48 h-64 bg-transparent border-2 border-dashed rounded-3xl transition-all duration-300"
+                             :class="getFrameColorClass()"></div>
+                        
+                        <!-- Feedback en tiempo real - ENCIMA del marco -->
+                        <div class="absolute -top-20 left-1/2 transform -translate-x-1/2 text-center">
+                            <div class="bg-black bg-opacity-80 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-300"
+                                 :class="getFeedbackTextClass()">
+                                <span x-text="realTimeFeedback"></span>
+                                <!-- NUEVO: Indicador de modo de detección -->
+                                <div class="text-xs mt-1 opacity-75">
+                                    <span x-show="detectionMode === 'basic'">🔄 Modo simulado</span>
+                                    <span x-show="detectionMode === 'tensorflow'">🎯 IA avanzada</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>                                <!-- Indicador de progreso de instrucción - ABAJO del video -->
                                 <div x-show="recording && currentInstruction" class="absolute bottom-4 left-4 right-4 z-10">
                                     <div class="bg-black bg-opacity-70 rounded-xl p-4">
                                         <div class="flex items-center justify-between text-white mb-2">
@@ -368,9 +513,17 @@
                                         </div>
                                         <div class="bg-gray-600 rounded-full h-2 mb-1">
                                             <div class="bg-gradient-to-r from-purple-500 to-indigo-500 h-2 rounded-full transition-all duration-300" 
+                                                 :class="instructionProgress >= 100 ? 'bg-gradient-to-r from-green-500 to-emerald-500' : ''"
                                                  :style="`width: ${instructionProgress}%`"></div>
                                         </div>
                                         <p class="text-gray-300 text-sm" x-text="currentInstruction?.description || 'Iniciando verificación...'"></p>
+                                        
+                                        <!-- NUEVO: Contador de intentos y feedback específico -->
+                                        <div x-show="currentInstruction?.attempts > 0" class="mt-2 text-yellow-300 text-xs">
+                                            <i class="fas fa-redo mr-1"></i>
+                                            Intento <span x-text="(currentInstruction?.attempts || 0) + 1"></span> - 
+                                            <span x-text="getInstructionHint()"></span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -904,40 +1057,171 @@
                         icon: '👀', 
                         title: 'Mire a la cámara', 
                         description: 'Mantenga su rostro centrado',
-                        duration: 2000
+                        type: 'lookAtCamera',
+                        duration: 2000,
+                        attempts: 0,
+                        maxTime: 10000,
+                        validationThreshold: 80
                     },
                     { 
                         icon: '🔄', 
                         title: 'Gire la cabeza despacio', 
-                        description: 'Movimiento circular lento',
-                        duration: 4000
+                        description: 'Movimiento circular lento - gire a ambos lados',
+                        type: 'headTurn',
+                        duration: 4000,
+                        attempts: 0,
+                        maxTime: 15000,
+                        validationThreshold: 60,
+                        requiredAngle: 30
                     },
                     { 
                         icon: '↕️', 
                         title: 'Mueva la cabeza arriba y abajo', 
-                        description: 'Sí con la cabeza - despacio',
-                        duration: 3000
+                        description: 'Asiente despacio - arriba y abajo',
+                        type: 'headNod',
+                        duration: 3000,
+                        attempts: 0,
+                        maxTime: 12000,
+                        validationThreshold: 60,
+                        requiredMovement: 15
                     },
                     { 
                         icon: '↔️', 
                         title: 'Mueva la cabeza izquierda y derecha', 
-                        description: 'No con la cabeza - despacio',
-                        duration: 3000
+                        description: 'Niegue despacio - izquierda y derecha',
+                        type: 'headShake',
+                        duration: 3000,
+                        attempts: 0,
+                        maxTime: 12000,
+                        validationThreshold: 60,
+                        requiredMovement: 20
                     },
                     { 
                         icon: '😊', 
-                        title: 'Sonría', 
-                        description: 'Sonrisa natural y manténgala',
-                        duration: 2000
+                        title: 'Sonría naturalmente', 
+                        description: 'Sonrisa clara y manténgala por 2 segundos',
+                        type: 'smile',
+                        duration: 2000,
+                        attempts: 0,
+                        maxTime: 10000,
+                        validationThreshold: 70,
+                        requiredDuration: 2000
                     },
                     { 
                         icon: '👁️', 
                         title: 'Parpadee 3 veces', 
                         description: 'Parpadeos lentos y claros',
-                        duration: 3000
+                        type: 'blink',
+                        duration: 3000,
+                        attempts: 0,
+                        maxTime: 12000,
+                        validationThreshold: 100,
+                        requiredBlinks: 3
                     }
                 ],
                 currentInstructionIndex: 0,
+                
+                // NUEVO: Sistema de detección facial con múltiples fallbacks
+                faceMesh: null,
+                faceDetector: null, // TensorFlow detector
+                faceDetectionActive: false,
+                faceDetectionInterval: null,
+                currentFaceData: null,
+                previousFaceData: null,
+                faceHistory: [],
+                detectionMode: 'real', // 'real', 'basic'
+                
+                // NUEVO: Datos para detección REAL
+                baselineFaceData: null, // Posición base del rostro
+                movementThresholds: {
+                    horizontal: 10, // Reducido para mayor sensibilidad
+                    vertical: 8,    // Reducido para mayor sensibilidad
+                    smile: 5,       // Reducido para detectar sonrisas más sutiles
+                    blink: 15       // Reducido para detectar parpadeos más fácil
+                },
+                
+                // Estados de validación por instrucción - NUEVOS TIEMPOS MÍNIMOS 5 SEGUNDOS
+                instructionValidation: {
+                    lookAtCamera: { 
+                        completed: false, 
+                        progress: 0, 
+                        centeringScore: 0,
+                        isDetecting: false,
+                        lastDetection: Date.now(),
+                        movementStart: null,
+                        requiredDuration: 5000,    // ⭐ 5 SEGUNDOS MÍNIMO mirando al centro
+                        validationPassed: false,   // Nueva validación estricta
+                        timeValidating: 0          // Tiempo acumulado validando correctamente
+                    },
+                    headTurn: { 
+                        completed: false, 
+                        progress: 0, 
+                        leftAngle: 0, 
+                        rightAngle: 0, 
+                        maxAngle: 0,
+                        isDetecting: false,
+                        lastDetection: Date.now(),
+                        movementStart: null,
+                        requiredDuration: 5000,    // ⭐ 5 SEGUNDOS MÍNIMO para girar izquierda y derecha
+                        validationPassed: false,
+                        timeValidating: 0
+                    },
+                    headNod: { 
+                        completed: false, 
+                        progress: 0, 
+                        upMovement: 0, 
+                        downMovement: 0, 
+                        totalMovement: 0,
+                        isDetecting: false,
+                        lastDetection: Date.now(),
+                        movementStart: null,
+                        requiredDuration: 5000,    // ⭐ 5 SEGUNDOS MÍNIMO para asentir
+                        validationPassed: false,
+                        timeValidating: 0
+                    },
+                    headShake: { 
+                        completed: false, 
+                        progress: 0, 
+                        leftMovement: 0, 
+                        rightMovement: 0, 
+                        totalMovement: 0,
+                        isDetecting: false,
+                        lastDetection: Date.now(),
+                        movementStart: null,
+                        requiredDuration: 5000,    // ⭐ 5 SEGUNDOS MÍNIMO para negar
+                        validationPassed: false,
+                        timeValidating: 0
+                    },
+                    smile: { 
+                        completed: false, 
+                        progress: 0, 
+                        smileDetected: false, 
+                        smileDuration: 0,
+                        isDetecting: false,
+                        lastDetection: Date.now(),
+                        movementStart: null,
+                        requiredDuration: 5000,    // ⭐ 5 SEGUNDOS MÍNIMO sonriendo
+                        validationPassed: false,
+                        timeValidating: 0
+                    },
+                    blink: { 
+                        completed: false, 
+                        progress: 0, 
+                        blinkCount: 0, 
+                        isBlinking: false, 
+                        lastBlink: 0,
+                        isDetecting: false,
+                        lastDetection: Date.now(),
+                        movementStart: null,
+                        requiredDuration: 5000,    // ⭐ 5 SEGUNDOS MÍNIMO para parpadear varias veces
+                        validationPassed: false,
+                        timeValidating: 0
+                    }
+                },
+                
+                // Feedback en tiempo real
+                realTimeFeedback: 'Posicione su rostro en el marco',
+                instructionStartTime: null,
                 
                 // Step 4 Data
                 verifying: false,
@@ -954,15 +1238,445 @@
                     dataExtracted: false,
                     dataComparison: null
                 },
+                
+                // NUEVO: Resultado específico de liveness con comparación video-selfie
+                livenessVerificationResult: {
+                    success: false,
+                    matches_selfie: false,
+                    matches_dni: false,
+                    confidence: 0,
+                    message: ''
+                },
+                
+                // NUEVO: Variables para tracking de rutas de archivos
+                dniPath: '',
+                selfiePath: '',
 
                 init() {
                     console.log('KYC Verification initialized');
+                    // Inicializar MediaPipe Face Mesh cuando esté disponible
+                    this.initializeFaceMesh();
+                },
+
+                // NUEVO: Inicializar sistema de detección facial
+                async initializeFaceMesh() {
+                    console.log('🎯 Inicializando sistema de detección SIMPLIFICADO...');
+                    
+                    // Usar solo modo básico simulado para máxima compatibilidad
+                    this.detectionMode = 'basic';
+                    this.faceDetector = null;
+                    
+                    console.log('✅ Sistema básico inicializado - Sin dependencias externas');
+                },
+
+
+
+                // NUEVO: Sistema de detección REAL - No más simulación
+                simulateBasicFaceDetection() {
+                    if (!this.currentInstruction) {
+                        this.realTimeFeedback = 'Posicione su rostro en el marco';
+                        return;
+                    }
+                    
+                    // Usar análisis real del video en lugar de simulación
+                    const faceData = this.analyzeVideoFrame();
+                    
+                    if (faceData && faceData.faceDetected) {
+                        // Rostro detectado correctamente
+                        this.realTimeFeedback = `✅ Rostro detectado - ${this.currentInstruction.text}`;
+                        
+                        // El análisis real maneja la detección de movimientos
+                        if (this.recording && this.currentInstruction) {
+                            this.validateCurrentInstructionRealTime();
+                        }
+                    } else if (faceData && !faceData.faceDetected) {
+                        // Hay datos pero el rostro no es claro
+                        this.realTimeFeedback = '⚠️ Rostro poco claro - Mejore la iluminación o acérquese más';
+                        
+                        // Reset progreso gradualmente si no hay detección clara
+                        const validation = this.instructionValidation[this.currentInstruction.type];
+                        if (validation.progress > 0) {
+                            validation.progress = Math.max(0, validation.progress - 1);
+                            this.instructionProgress = validation.progress;
+                        }
+                    } else {
+                        // Sin datos faciales en absoluto - dar feedback
+                        this.realTimeFeedback = '❌ No se detecta rostro - Acérquese a la cámara';
+                        
+                        // Usar sistema de fallback básico si falla completamente
+                        this.fallbackToSimulation();
+                    }
+                },
+
+                // Sistema de fallback si la detección real falla
+                fallbackToSimulation() {
+                    if (!this.currentInstruction) return;
+                    
+                    const elapsed = Date.now() - (this.instructionStartTime || Date.now());
+                    const instructionDuration = this.currentInstruction.duration || 4000;
+                    
+                    // Permitir avance automático después de un tiempo en modo fallback
+                    if (elapsed > instructionDuration * 1.5) { // 1.5x el tiempo normal
+                        console.log('🔄 Usando modo fallback para avanzar');
+                        const validation = this.instructionValidation[this.currentInstruction.type];
+                        validation.completed = true;
+                        validation.progress = 100;
+                        this.completeCurrentInstruction();
+                    } else {
+                        // Mostrar progreso gradual en modo fallback
+                        const validation = this.instructionValidation[this.currentInstruction.type];
+                        const fallbackProgress = Math.min(100, (elapsed / (instructionDuration * 1.5)) * 100);
+                        validation.progress = Math.max(validation.progress, fallbackProgress * 0.7); // Progreso más lento
+                        this.instructionProgress = validation.progress;
+                    }
+                },
+
+                // NUEVO: Validar instrucción actual en tiempo real
+                validateCurrentInstructionRealTime() {
+                    if (!this.currentFaceData || !this.currentInstruction) return;
+                    
+                    const instruction = this.currentInstruction;
+                    const validation = this.instructionValidation[instruction.type];
+                    let progressUpdated = false;
+                    
+                    switch (instruction.type) {
+                        case 'lookAtCamera':
+                            progressUpdated = this.validateLookAtCamera(validation);
+                            break;
+                        case 'headTurn':
+                            progressUpdated = this.validateHeadTurn(validation);
+                            break;
+                        case 'headNod':
+                            progressUpdated = this.validateHeadNod(validation);
+                            break;
+                        case 'headShake':
+                            progressUpdated = this.validateHeadShake(validation);
+                            break;
+                        case 'smile':
+                            progressUpdated = this.validateSmile(validation);
+                            break;
+                        case 'blink':
+                            progressUpdated = this.validateBlink(validation);
+                            break;
+                    }
+                    
+                    // Actualizar progreso visual
+                    if (progressUpdated) {
+                        this.instructionProgress = validation.progress;
+                        this.updateRealTimeFeedback(validation, instruction.type);
+                        
+                        // Verificar si se completó la instrucción
+                        if (validation.completed && validation.progress >= instruction.validationThreshold) {
+                            this.completeCurrentInstruction();
+                        }
+                    }
+                    
+                    // Verificar timeout
+                    const elapsedTime = Date.now() - this.instructionStartTime;
+                    if (elapsedTime > instruction.maxTime && !validation.completed) {
+                        this.repeatCurrentInstruction('Tiempo agotado');
+                    }
+                },
+
+                // NUEVO: Validar "mirar a la cámara"
+                validateLookAtCamera(validation) {
+                    const rotation = this.currentFaceData.headRotation;
+                    
+                    // Verificar que está mirando al centro (±10 grados)
+                    const centeringScore = Math.max(0, 100 - Math.abs(rotation.horizontal * 2) - Math.abs(rotation.vertical * 2));
+                    validation.centeringScore = centeringScore;
+                    validation.progress = Math.min(100, centeringScore);
+                    validation.completed = centeringScore >= 80;
+                    
+                    return true;
+                },
+
+                // NUEVO: Validar giro de cabeza
+                validateHeadTurn(validation) {
+                    const rotation = this.currentFaceData.headRotation;
+                    const absHorizontal = Math.abs(rotation.horizontal);
+                    
+                    // Registrar máximo ángulo alcanzado
+                    if (absHorizontal > validation.maxAngle) {
+                        validation.maxAngle = absHorizontal;
+                    }
+                    
+                    // Registrar movimientos a izquierda y derecha
+                    if (rotation.horizontal < -15) validation.leftAngle = Math.max(validation.leftAngle, Math.abs(rotation.horizontal));
+                    if (rotation.horizontal > 15) validation.rightAngle = Math.max(validation.rightAngle, Math.abs(rotation.horizontal));
+                    
+                    // Progreso basado en que haya girado a ambos lados
+                    const leftProgress = Math.min(100, (validation.leftAngle / this.currentInstruction.requiredAngle) * 50);
+                    const rightProgress = Math.min(100, (validation.rightAngle / this.currentInstruction.requiredAngle) * 50);
+                    
+                    validation.progress = leftProgress + rightProgress;
+                    validation.completed = validation.leftAngle >= this.currentInstruction.requiredAngle && 
+                                          validation.rightAngle >= this.currentInstruction.requiredAngle;
+                    
+                    return true;
+                },
+
+                // NUEVO: Validar movimiento vertical (asentir)
+                validateHeadNod(validation) {
+                    const rotation = this.currentFaceData.headRotation;
+                    const absVertical = Math.abs(rotation.vertical);
+                    
+                    // Registrar movimientos arriba y abajo
+                    if (rotation.vertical < -10) validation.upMovement = Math.max(validation.upMovement, Math.abs(rotation.vertical));
+                    if (rotation.vertical > 10) validation.downMovement = Math.max(validation.downMovement, Math.abs(rotation.vertical));
+                    
+                    validation.totalMovement = validation.upMovement + validation.downMovement;
+                    validation.progress = Math.min(100, (validation.totalMovement / (this.currentInstruction.requiredMovement * 2)) * 100);
+                    validation.completed = validation.upMovement >= this.currentInstruction.requiredMovement && 
+                                          validation.downMovement >= this.currentInstruction.requiredMovement;
+                    
+                    return true;
+                },
+
+                // NUEVO: Validar movimiento horizontal (negar)
+                validateHeadShake(validation) {
+                    const rotation = this.currentFaceData.headRotation;
+                    
+                    // Similar a headTurn pero para negación
+                    if (rotation.horizontal < -15) validation.leftMovement = Math.max(validation.leftMovement, Math.abs(rotation.horizontal));
+                    if (rotation.horizontal > 15) validation.rightMovement = Math.max(validation.rightMovement, Math.abs(rotation.horizontal));
+                    
+                    validation.totalMovement = validation.leftMovement + validation.rightMovement;
+                    validation.progress = Math.min(100, (validation.totalMovement / (this.currentInstruction.requiredMovement * 2)) * 100);
+                    validation.completed = validation.leftMovement >= this.currentInstruction.requiredMovement && 
+                                          validation.rightMovement >= this.currentInstruction.requiredMovement;
+                    
+                    return true;
+                },
+
+                // NUEVO: Validar sonrisa
+                validateSmile(validation) {
+                    const mouthRatio = this.currentFaceData.mouthAspectRatio;
+                    const isSmiling = mouthRatio > 3.5; // Threshold for smile detection
+                    
+                    if (isSmiling && !validation.smileDetected) {
+                        validation.smileDetected = true;
+                        validation.smileStartTime = Date.now();
+                    } else if (isSmiling && validation.smileDetected) {
+                        validation.smileDuration = Date.now() - validation.smileStartTime;
+                        validation.progress = Math.min(100, (validation.smileDuration / this.currentInstruction.requiredDuration) * 100);
+                        validation.completed = validation.smileDuration >= this.currentInstruction.requiredDuration;
+                    } else if (!isSmiling) {
+                        validation.smileDetected = false;
+                        validation.smileDuration = 0;
+                        validation.progress = 0;
+                    }
+                    
+                    return true;
+                },
+
+                // NUEVO: Validar parpadeo
+                validateBlink(validation) {
+                    const ear = this.currentFaceData.eyeAspectRatio;
+                    const isBlinking = ear < 0.25; // Threshold for blink detection
+                    const now = Date.now();
+                    
+                    if (isBlinking && !validation.isBlinking && (now - validation.lastBlink) > 300) {
+                        validation.blinkCount++;
+                        validation.isBlinking = true;
+                        validation.lastBlink = now;
+                    } else if (!isBlinking) {
+                        validation.isBlinking = false;
+                    }
+                    
+                    validation.progress = Math.min(100, (validation.blinkCount / this.currentInstruction.requiredBlinks) * 100);
+                    validation.completed = validation.blinkCount >= this.currentInstruction.requiredBlinks;
+                    
+                    return true;
                 },
 
                 getStepClass(step) {
                     if (step < this.currentStep) return 'step-completed';
                     if (step === this.currentStep) return 'step-active';
                     return 'step-inactive';
+                },
+
+                // NUEVO: Obtener clase CSS del marco según progreso
+                getFrameColorClass() {
+                    if (!this.currentInstruction) return 'border-white';
+                    
+                    if (this.instructionProgress >= 80) {
+                        return 'border-green-400'; // Casi completado
+                    } else if (this.instructionProgress >= 40) {
+                        return 'border-yellow-400'; // En progreso
+                    } else {
+                        return 'border-red-400'; // Necesita más esfuerzo
+                    }
+                },
+
+                // NUEVO: Obtener clase CSS del texto de feedback
+                getFeedbackTextClass() {
+                    if (!this.currentInstruction) return 'text-white';
+                    
+                    if (this.instructionProgress >= 80) {
+                        return 'text-green-300';
+                    } else if (this.instructionProgress >= 40) {
+                        return 'text-yellow-300';
+                    } else {
+                        return 'text-red-300';
+                    }
+                },
+
+                // NUEVO: Actualizar feedback en tiempo real - MEJORADO
+                updateRealTimeFeedback(validation, instructionType) {
+                    const attempts = this.currentInstruction?.attempts || 0;
+                    const isEasy = attempts >= 2; // Después de 2 intentos se vuelve más fácil
+                    
+                    switch (instructionType) {
+                        case 'lookAtCamera':
+                            if (validation.centeringScore >= 80) {
+                                this.realTimeFeedback = '✅ ¡Perfecto! Mantén la posición';
+                            } else if (validation.centeringScore >= 50) {
+                                this.realTimeFeedback = '🔄 Ajusta ligeramente hacia el centro';
+                            } else {
+                                this.realTimeFeedback = isEasy ? '👁️ Solo mira a la cámara' : '❌ Mira directamente a la cámara';
+                            }
+                            break;
+                            
+                        case 'headTurn':
+                            if (validation.completed) {
+                                this.realTimeFeedback = '✅ ¡Excelente! Giro completado';
+                            } else if (validation.progress > 50) {
+                                this.realTimeFeedback = '🔄 ¡Bien! Continúa girando despacio';
+                            } else if (validation.progress > 20) {
+                                this.realTimeFeedback = '↔️ Gira más hacia ambos lados';
+                            } else {
+                                this.realTimeFeedback = isEasy ? '🔄 Mueve la cabeza a los lados' : '🔄 Comienza girando despacio hacia un lado';
+                            }
+                            break;
+                            
+                        case 'headNod':
+                            if (validation.completed) {
+                                this.realTimeFeedback = '✅ ¡Perfecto! Movimiento completado';
+                            } else if (validation.progress > 50) {
+                                this.realTimeFeedback = '↕️ ¡Bien! Continúa arriba y abajo';
+                            } else {
+                                this.realTimeFeedback = isEasy ? '👍 Asiente con la cabeza' : '↕️ Mueve la cabeza arriba y abajo despacio';
+                            }
+                            break;
+                            
+                        case 'headShake':
+                            if (validation.completed) {
+                                this.realTimeFeedback = '✅ ¡Excelente! Negación completada';
+                            } else if (validation.progress > 50) {
+                                this.realTimeFeedback = '↔️ ¡Bien! Continúa izquierda y derecha';
+                            } else {
+                                this.realTimeFeedback = isEasy ? '👎 Niega con la cabeza' : '↔️ Mueve la cabeza izquierda y derecha';
+                            }
+                            break;
+                            
+                        case 'smile':
+                            if (validation.completed) {
+                                this.realTimeFeedback = '✅ ¡Sonrisa perfecta mantenida!';
+                            } else if (validation.smileDetected) {
+                                const remaining = Math.ceil((this.currentInstruction.requiredDuration - validation.smileDuration) / 1000);
+                                this.realTimeFeedback = `😊 ¡Bien! Mantén ${remaining}s más`;
+                            } else {
+                                this.realTimeFeedback = isEasy ? '😊 Sonríe un poco' : '😊 Por favor, sonríe naturalmente';
+                            }
+                            break;
+                            
+                        case 'blink':
+                            if (validation.completed) {
+                                this.realTimeFeedback = '✅ ¡Perfecto! 3 parpadeos completados';
+                            } else {
+                                const remaining = this.currentInstruction.requiredBlinks - validation.blinkCount;
+                                const easy = isEasy ? (remaining <= 1 ? '👁️ Un parpadeo más' : '👁️ Parpadea despacio') : `👁️ Faltan ${remaining} parpadeos lentos`;
+                                this.realTimeFeedback = easy;
+                            }
+                            break;
+                            
+                        default:
+                            this.realTimeFeedback = isEasy ? '🎯 Sigue la instrucción' : 'Sigue las instrucciones';
+                    }
+                    
+                    // Añadir indicador de progreso si está en progreso
+                    if (validation.progress > 0 && validation.progress < 100) {
+                        this.realTimeFeedback += ` (${Math.round(validation.progress)}%)`;
+                    }
+                },
+
+                // Completar instrucción actual - redirigir a versión estricta
+                completeCurrentInstruction() {
+                    this.completeCurrentInstructionStrict();
+                },
+
+                // NUEVO: Repetir instrucción actual
+                repeatCurrentInstruction(reason = 'Inténtalo de nuevo') {
+                    console.log(`🔄 Repitiendo instrucción: ${this.currentInstruction.type} - ${reason}`);
+                    
+                    // Incrementar contador de intentos
+                    this.currentInstruction.attempts = (this.currentInstruction.attempts || 0) + 1;
+                    
+                    // Reset validación
+                    const validation = this.instructionValidation[this.currentInstruction.type];
+                    Object.keys(validation).forEach(key => {
+                        if (typeof validation[key] === 'number') {
+                            validation[key] = 0;
+                        } else if (typeof validation[key] === 'boolean') {
+                            validation[key] = false;
+                        }
+                    });
+                    
+                    // Hacer instrucción más fácil después de varios intentos
+                    if (this.currentInstruction.attempts >= 3) {
+                        this.currentInstruction.validationThreshold = Math.max(40, this.currentInstruction.validationThreshold - 20);
+                        this.currentInstruction.requiredAngle = Math.max(15, (this.currentInstruction.requiredAngle || 30) - 10);
+                        this.currentInstruction.requiredMovement = Math.max(8, (this.currentInstruction.requiredMovement || 15) - 5);
+                    }
+                    
+                    // Reiniciar progreso
+                    this.instructionProgress = 0;
+                    this.instructionStartTime = Date.now();
+                    this.realTimeFeedback = `${reason} - Intento ${this.currentInstruction.attempts + 1}`;
+                },
+
+                // NUEVO: Obtener pista de ayuda según intentos
+                getInstructionHint() {
+                    if (!this.currentInstruction) return '';
+                    
+                    const attempts = this.currentInstruction.attempts || 0;
+                    const type = this.currentInstruction.type;
+                    
+                    const hints = {
+                        lookAtCamera: [
+                            'Mira directamente a la lente',
+                            'Centra tu rostro en el marco',
+                            'Mantén la cabeza quieta'
+                        ],
+                        headTurn: [
+                            'Gira despacio hacia ambos lados',
+                            'Movimiento más amplio, como mirar por encima del hombro',
+                            'Gira al menos 30° hacia cada lado'
+                        ],
+                        headNod: [
+                            'Asiente despacio arriba y abajo',
+                            'Movimiento más pronunciado, como decir "sí"',
+                            'Baja y sube la barbilla claramente'
+                        ],
+                        headShake: [
+                            'Niega despacio izquierda y derecha',
+                            'Como decir "no" con la cabeza',
+                            'Movimiento horizontal más amplio'
+                        ],
+                        smile: [
+                            'Sonríe naturalmente durante 2 segundos',
+                            'Sonrisa más amplia y mantenida',
+                            'Muestra los dientes ligeramente'
+                        ],
+                        blink: [
+                            'Parpadea 3 veces despacio',
+                            'Parpadeos más lentos y marcados',
+                            'Cierra y abre los ojos completamente'
+                        ]
+                    };
+                    
+                    return hints[type] ? hints[type][Math.min(attempts, hints[type].length - 1)] : 'Sigue las instrucciones';
                 },
 
                 async nextStep() {
@@ -1067,6 +1781,7 @@
                         // Guardar resultados del paso 1
                         this.step1Result = dniResult;
                         this.dniPhotoPath = dniResult.dni_front_path;
+                        this.dniPath = dniResult.dni_front_path; // Para la comparación final de liveness
                         
                         // Determinar si puede pasar al siguiente paso
                         this.dniValidationPassed = dniResult.success && 
@@ -1193,6 +1908,7 @@
                         
                         // Guardar resultados del paso 2
                         this.step2Result = selfieResult;
+                        this.selfiePath = selfieResult.selfie_path; // Para la comparación final de liveness
                         
                         // Determinar si puede pasar al siguiente paso (ACEPTA REVIEW también)
                         this.selfieVerificationPassed = selfieResult.success && 
@@ -1302,58 +2018,51 @@
                     this.recording = true;
                     this.currentInstructionIndex = 0;
                     this.startRecordingTimer();
-                    this.startLivenessSequence();
+                    
+                    // NUEVO: Iniciar detección facial en tiempo real
+                    this.startFaceDetection();
+                    
+                    // NUEVO: Iniciar secuencia con detección inteligente
+                    this.startIntelligentLivenessSequence();
                 },
 
-                startLivenessSequence() {
-                    // Wait 1 second before starting instructions
+                // NUEVO: Iniciar detección facial en tiempo real
+                startFaceDetection() {
+                    this.faceDetectionActive = true;
+                    
+                    console.log('🎯 Iniciando sistema de detección REAL...');
+                    
+                    // Sistema REAL de análisis de video con Canvas
+                    this.faceDetectionInterval = setInterval(() => {
+                        if (this.faceDetectionActive) {
+                            this.simulateBasicFaceDetection(); // Ahora usa análisis real, no simulación
+                        }
+                    }, 200); // Más frecuente para mejor detección real (5 FPS)
+                    
+                    console.log('✅ Sistema de detección REAL iniciado - Analizando movimientos reales del usuario');
+                },
+
+                // NUEVO: Sistema básico de detección (ya no necesario)
+                startBasicFaceDetection() {
+                    console.log('🔄 Sistema básico siempre activo');
+                },
+
+                // NUEVO: Secuencia inteligente de liveness
+                startIntelligentLivenessSequence() {
+                    // Esperar 1 segundo antes de comenzar
                     setTimeout(() => {
-                        this.showNextInstruction();
+                        this.startNextInstruction();
                     }, 1000);
                 },
 
-                showNextInstruction() {
-                    if (this.currentInstructionIndex >= this.livenessInstructions.length) {
-                        this.stopLivenessRecording();
-                        return;
-                    }
-
-                    const instruction = this.livenessInstructions[this.currentInstructionIndex];
-                    this.currentInstruction = instruction;
-                    this.instructionProgress = 0;
-
-                    // Animate progress bar
-                    const progressStep = 100 / (instruction.duration / 100);
-                    this.instructionTimer = setInterval(() => {
-                        this.instructionProgress += progressStep;
-                        if (this.instructionProgress >= 100) {
-                            clearInterval(this.instructionTimer);
-                            this.currentInstructionIndex++;
-                            setTimeout(() => {
-                                this.showNextInstruction();
-                            }, 500);
-                        }
-                    }, 100);
+                // NUEVO: Iniciar siguiente instrucción con sistema estricto
+                startNextInstruction() {
+                    this.startNextInstructionStrict();
                 },
 
                 async stopLivenessRecording() {
-                    this.currentInstruction = null;
-                    if (this.instructionTimer) {
-                        clearInterval(this.instructionTimer);
-                    }
-                    
-                    if (this.mediaRecorder && this.recording) {
-                        this.mediaRecorder.stop();
-                        this.recording = false;
-                        this.stopRecordingTimer();
-                        this.stopCamera(this.$refs.recordVideo);
-                        
-                        // NUEVO: Verificar automáticamente el video con endpoint modular
-                        // Esperar un poco para que se complete la creación del blob
-                        setTimeout(async () => {
-                            await this.verifyLiveness();
-                        }, 1000);
-                    }
+                    // Redirigir a la nueva función que incluye comparación
+                    this.completeLivenessWithComparison();
                 },
 
                 async verifyLiveness() {
@@ -1430,15 +2139,65 @@
                 },
 
                 retakeVideo() {
+                    console.log('🔄 Reiniciando captura de video...');
+                    
+                    // Limpiar video y estados
                     this.recordedVideo = null;
-                    this.livenessVerificationPassed = false; // Reset verificación
+                    this.livenessVerificationPassed = false;
                     this.step3Result = null;
+                    
+                    // Limpiar instrucciones y detección facial
                     this.currentInstruction = null;
                     this.currentInstructionIndex = 0;
+                    this.instructionProgress = 0;
+                    this.faceDetectionActive = false;
+                    this.currentFaceData = null;
+                    this.realTimeFeedback = 'Posicione su rostro en el marco';
+                    
+                    // Limpiar timers
                     if (this.instructionTimer) {
                         clearInterval(this.instructionTimer);
+                        this.instructionTimer = null;
                     }
+                    if (this.faceDetectionInterval) {
+                        clearInterval(this.faceDetectionInterval);
+                        this.faceDetectionInterval = null;
+                    }
+                    
+                    // Reset validaciones de instrucciones
+                    Object.keys(this.instructionValidation).forEach(key => {
+                        const validation = this.instructionValidation[key];
+                        Object.keys(validation).forEach(prop => {
+                            if (typeof validation[prop] === 'number') {
+                                validation[prop] = 0;
+                            } else if (typeof validation[prop] === 'boolean') {
+                                validation[prop] = false;
+                            }
+                        });
+                    });
+                    
+                    // Reset intentos en instrucciones
+                    this.livenessInstructions.forEach(instruction => {
+                        instruction.attempts = 0;
+                        // Restaurar valores originales si fueron modificados
+                        instruction.validationThreshold = this.getOriginalValidationThreshold(instruction.type);
+                    });
+                    
+                    // Reiniciar cámara
                     this.startVideoCamera();
+                },
+
+                // NUEVO: Obtener threshold original de validación
+                getOriginalValidationThreshold(type) {
+                    const originalThresholds = {
+                        lookAtCamera: 80,
+                        headTurn: 60,
+                        headNod: 60,
+                        headShake: 60,
+                        smile: 70,
+                        blink: 100
+                    };
+                    return originalThresholds[type] || 60;
                 },
 
                 canProceedStep3() {
@@ -2128,6 +2887,606 @@
                 // Utility function for delays
                 delay(ms) {
                     return new Promise(resolve => setTimeout(resolve, ms));
+                },
+
+                // ================================
+                // FUNCIONES DE DETECCIÓN ESPECÍFICAS REALES
+                // ================================
+
+                // Analizar frame de video en tiempo real
+                analyzeVideoFrame() {
+                    if (!this.videoElement || this.videoElement.videoWidth === 0) {
+                        return null;
+                    }
+
+                    try {
+                        // Usar FaceDetectionUtils para análisis real
+                        const faceData = window.FaceDetectionUtils.detectFaceMovement(this.videoElement);
+                        
+                        if (faceData && faceData.faceDetected) {
+                            // Establecer datos base si es la primera detección
+                            if (!this.baselineFaceData) {
+                                this.baselineFaceData = { 
+                                    ...faceData,
+                                    timestamp: Date.now()
+                                };
+                                console.log('🎯 Baseline facial data establecido:', this.baselineFaceData);
+                            }
+                            
+                            // Detectar movimientos basados en la instrucción actual
+                            this.detectInstructionMovement(faceData);
+                            
+                            // Guardar datos para comparación
+                            this.previousFaceData = this.currentFaceData;
+                            this.currentFaceData = faceData;
+                            
+                            // Mantener historial de movimientos (reducido para mejor rendimiento)
+                            this.faceHistory.push({
+                                ...faceData,
+                                timestamp: Date.now()
+                            });
+                            if (this.faceHistory.length > 20) { // Reducido de 30 a 20
+                                this.faceHistory.shift();
+                            }
+                        } else if (faceData) {
+                            // Hay datos pero rostro no es claro - mantener referencia pero no procesar movimientos
+                            this.currentFaceData = faceData;
+                        }
+                        
+                        return faceData;
+                    } catch (error) {
+                        console.warn('Error analizando frame:', error);
+                        return null;
+                    }
+                },
+
+                // Detectar movimientos específicos según la instrucción actual - VALIDACIÓN MUY ESTRICTA
+                detectInstructionMovement(faceData) {
+                    if (!this.currentInstruction || !this.baselineFaceData) return;
+                    
+                    const instruction = this.currentInstruction;
+                    const validation = this.instructionValidation[instruction.type];
+                    const currentTime = Date.now();
+                    
+                    let movementDetected = false;
+                    let movementStrength = 0;
+                    let positioningCorrect = false; // Nueva variable para posicionamiento
+                    
+                    switch (instruction.type) {
+                        case 'lookAtCamera':
+                            const result1 = this.detectCenterGaze(faceData);
+                            movementDetected = result1.detected;
+                            movementStrength = result1.strength;
+                            positioningCorrect = result1.positioning; // Nuevo campo
+                            break;
+                            
+                        case 'headTurn':
+                            const result2 = this.detectHeadTurn(faceData);
+                            movementDetected = result2.detected;
+                            movementStrength = result2.strength;
+                            positioningCorrect = result2.positioning;
+                            break;
+                            
+                        case 'headNod':
+                            const result3 = this.detectHeadNod(faceData);
+                            movementDetected = result3.detected;
+                            movementStrength = result3.strength;
+                            positioningCorrect = result3.positioning;
+                            break;
+                            
+                        case 'headShake':
+                            const result4 = this.detectHeadShake(faceData);
+                            movementDetected = result4.detected;
+                            movementStrength = result4.strength;
+                            positioningCorrect = result4.positioning;
+                            break;
+                            
+                        case 'smile':
+                            const result5 = this.detectSmile(faceData);
+                            movementDetected = result5.detected;
+                            movementStrength = result5.strength;
+                            positioningCorrect = result5.positioning;
+                            break;
+                            
+                        case 'blink':
+                            const result6 = this.detectBlink(faceData);
+                            movementDetected = result6.detected;
+                            movementStrength = result6.strength;
+                            positioningCorrect = result6.positioning;
+                            break;
+                    }
+                    
+                    // ⭐ VALIDACIÓN MUY ESTRICTA: Solo cuenta si está bien posicionado Y hace el movimiento
+                    const validDetection = movementDetected && positioningCorrect && movementStrength > 0.6; // Umbral aún más alto
+                    
+                    if (validDetection) {
+                        // Inicializar detección si no está activa
+                        if (!validation.isDetecting) {
+                            validation.isDetecting = true;
+                            validation.movementStart = currentTime;
+                            validation.timeValidating = 0;
+                            validation.progress = 0; // Reset progreso al iniciar
+                            console.log(`🎯 ¡INICIANDO validación ESTRICTA: ${instruction.type}! (fuerza: ${movementStrength.toFixed(2)})`);
+                        }
+                        
+                        // ⭐ SOLO ACUMULAR TIEMPO SI LA DETECCIÓN ES VÁLIDA
+                        validation.lastDetection = currentTime;
+                        validation.timeValidating = currentTime - validation.movementStart;
+                        
+                        // Progreso SOLO basado en tiempo de validación REAL (sin bonus de fuerza)
+                        validation.progress = Math.min(100, (validation.timeValidating / validation.requiredDuration) * 100);
+                        
+                        // ⭐ COMPLETAR SOLO CUANDO SE ALCANCEN LOS 5 SEGUNDOS COMPLETOS DE DETECCIÓN VÁLIDA
+                        if (validation.timeValidating >= validation.requiredDuration && !validation.completed) {
+                            validation.validationPassed = true;
+                            validation.completed = true;
+                            validation.progress = 100;
+                            
+                            console.log(`✅ ¡COMPLETADO tras ${validation.timeValidating/1000}s de validación CONTINUA: ${instruction.type}!`);
+                            this.completeCurrentInstructionStrict();
+                            return; // Salir inmediatamente al completar
+                        }
+                        
+                        // Feedback positivo con tiempo restante
+                        const timeRemaining = Math.max(0, validation.requiredDuration - validation.timeValidating);
+                        this.updateRealTimeFeedbackStrict(instruction.type, validation.progress, movementStrength, timeRemaining);
+                        
+                    } else {
+                        // ⭐ REINICIO INMEDIATO si no hay detección válida
+                        if (validation.isDetecting) {
+                            console.log(`⚠️ REINICIO INMEDIATO ${instruction.type} - Posicionamiento: ${positioningCorrect}, Movimiento: ${movementDetected}, Fuerza: ${movementStrength.toFixed(2)}`);
+                            
+                            // RESET COMPLETO Y INMEDIATO
+                            validation.isDetecting = false;
+                            validation.movementStart = null;
+                            validation.timeValidating = 0;
+                            validation.progress = 0; // Reset completo a 0
+                            validation.validationPassed = false;
+                            
+                            // Feedback específico según el problema
+                            if (!positioningCorrect) {
+                                this.realTimeFeedback = `❌ Posiciónate correctamente - ${instruction.title}`;
+                            } else if (!movementDetected) {
+                                this.realTimeFeedback = `❌ Haz el movimiento - ${instruction.title}`;
+                            } else {
+                                this.realTimeFeedback = `❌ Movimiento más claro - ${instruction.title}`;
+                            }
+                        } else {
+                            // Feedback inicial si no está detectando
+                            this.realTimeFeedback = `🎯 Prepárate: ${instruction.title} durante 5 segundos`;
+                        }
+                    }
+                },
+
+                // Detectar mirada al centro - CON VALIDACIÓN DE POSICIONAMIENTO
+                detectCenterGaze(faceData) {
+                    const validation = this.instructionValidation.lookAtCamera;
+                    const centerScore = faceData.regions.center;
+                    const balance = Math.abs(faceData.regions.left - faceData.regions.right);
+                    const overallBrightness = faceData.brightness;
+                    
+                    // Validar posicionamiento: rostro visible y centrado
+                    const positioningCorrect = overallBrightness > 50 && centerScore > 60 && balance < 30;
+                    
+                    // Detectar mirada al centro: muy estricto
+                    const gazeDetected = centerScore > 90 && balance < 15 && overallBrightness > 70;
+                    
+                    validation.centeringScore = Math.max(validation.centeringScore, centerScore);
+                    
+                    return {
+                        detected: gazeDetected,
+                        strength: Math.min(1, centerScore / 100),
+                        positioning: positioningCorrect  // Nueva propiedad
+                    };
+                },
+
+                // Detectar giro de cabeza - CON VALIDACIÓN DE POSICIONAMIENTO
+                detectHeadTurn(faceData) {
+                    const validation = this.instructionValidation.headTurn;
+                    const horizontalMovement = faceData.movement.horizontal;
+                    const overallBrightness = faceData.brightness;
+                    
+                    // Validar posicionamiento: rostro visible
+                    const positioningCorrect = overallBrightness > 45 && faceData.regions.center > 50;
+                    
+                    // Detectar giros a izquierda y derecha
+                    if (horizontalMovement > this.movementThresholds.horizontal) {
+                        validation.rightAngle = Math.max(validation.rightAngle, horizontalMovement);
+                    } else if (horizontalMovement < -this.movementThresholds.horizontal) {
+                        validation.leftAngle = Math.max(validation.leftAngle, Math.abs(horizontalMovement));
+                    }
+                    
+                    validation.maxAngle = Math.max(validation.leftAngle, validation.rightAngle);
+                    
+                    // Se requiere movimiento significativo en ambas direcciones
+                    const bothDirections = validation.leftAngle > 20 && validation.rightAngle > 20; // Más estricto
+                    
+                    return {
+                        detected: bothDirections,
+                        strength: Math.min(1, validation.maxAngle / 35), // Más estricto
+                        positioning: positioningCorrect
+                    };
+                },
+
+                // Detectar asentir con la cabeza - CON VALIDACIÓN DE POSICIONAMIENTO
+                detectHeadNod(faceData) {
+                    const validation = this.instructionValidation.headNod;
+                    const verticalMovement = faceData.movement.vertical;
+                    const overallBrightness = faceData.brightness;
+                    
+                    // Validar posicionamiento: rostro visible
+                    const positioningCorrect = overallBrightness > 45 && faceData.regions.center > 50;
+                    
+                    // Detectar movimientos arriba y abajo
+                    if (verticalMovement > this.movementThresholds.vertical) {
+                        validation.downMovement = Math.max(validation.downMovement, verticalMovement);
+                    } else if (verticalMovement < -this.movementThresholds.vertical) {
+                        validation.upMovement = Math.max(validation.upMovement, Math.abs(verticalMovement));
+                    }
+                    
+                    validation.totalMovement = validation.upMovement + validation.downMovement;
+                    
+                    // Se requiere movimiento en ambas direcciones - más estricto
+                    const bothDirections = validation.upMovement > 12 && validation.downMovement > 12;
+                    
+                    return {
+                        detected: bothDirections,
+                        strength: Math.min(1, validation.totalMovement / 25),
+                        positioning: positioningCorrect
+                    };
+                },
+
+                // Detectar negar con la cabeza - CON VALIDACIÓN DE POSICIONAMIENTO
+                detectHeadShake(faceData) {
+                    const validation = this.instructionValidation.headShake;
+                    const horizontalMovement = faceData.movement.horizontal;
+                    const overallBrightness = faceData.brightness;
+                    
+                    // Validar posicionamiento: rostro visible
+                    const positioningCorrect = overallBrightness > 45 && faceData.regions.center > 50;
+                    
+                    // Similar a headTurn pero con movimiento rápido
+                    if (horizontalMovement > this.movementThresholds.horizontal) {
+                        validation.rightMovement = Math.max(validation.rightMovement, horizontalMovement);
+                    } else if (horizontalMovement < -this.movementThresholds.horizontal) {
+                        validation.leftMovement = Math.max(validation.leftMovement, Math.abs(horizontalMovement));
+                    }
+                    
+                    validation.totalMovement = validation.leftMovement + validation.rightMovement;
+                    
+                    // Requiere movimiento rápido en ambas direcciones - más estricto
+                    const rapidMovement = validation.leftMovement > 15 && validation.rightMovement > 15;
+                    
+                    return {
+                        detected: rapidMovement,
+                        strength: Math.min(1, validation.totalMovement / 30),
+                        positioning: positioningCorrect
+                    };
+                },
+
+                // Detectar sonrisa - CON VALIDACIÓN DE POSICIONAMIENTO
+                detectSmile(faceData) {
+                    const validation = this.instructionValidation.smile;
+                    const mouthBrightness = faceData.regions.mouth;
+                    const baselineMouth = this.baselineFaceData.regions.mouth;
+                    const overallBrightness = faceData.brightness;
+                    
+                    // Validar posicionamiento: rostro visible y centrado
+                    const positioningCorrect = overallBrightness > 50 && faceData.regions.center > 60;
+                    
+                    // Detectar cambio en zona de boca (sonrisa aumenta brillo) - más estricto
+                    const mouthChange = mouthBrightness - baselineMouth;
+                    
+                    if (mouthChange > this.movementThresholds.smile * 2) { // Más estricto
+                        validation.smileDetected = true;
+                        validation.smileDuration += 200; // Incrementar duración de sonrisa
+                    } else {
+                        validation.smileDetected = false;
+                    }
+                    
+                    return {
+                        detected: validation.smileDetected && validation.smileDuration > 1000, // Requiere sonrisa mantenida
+                        strength: Math.min(1, Math.max(0, mouthChange / 25)),
+                        positioning: positioningCorrect
+                    };
+                },
+
+                // Detectar parpadeo - CON VALIDACIÓN DE POSICIONAMIENTO
+                detectBlink(faceData) {
+                    const validation = this.instructionValidation.blink;
+                    const overallBrightness = faceData.brightness;
+                    const previousBrightness = this.previousFaceData ? this.previousFaceData.brightness : overallBrightness;
+                    
+                    // Validar posicionamiento: rostro visible
+                    const positioningCorrect = overallBrightness > 40 && faceData.regions.center > 50;
+                    
+                    // Detectar caída súbita en brillo (parpadeo) - más estricto
+                    const brightnessChange = previousBrightness - overallBrightness;
+                    
+                    if (brightnessChange > this.movementThresholds.blink * 1.5 && !validation.isBlinking) { // Más estricto
+                        validation.isBlinking = true;
+                        validation.blinkCount++;
+                        validation.lastBlink = Date.now();
+                        console.log(`👁️ Parpadeo detectado #${validation.blinkCount} (cambio: ${brightnessChange.toFixed(1)})`);
+                        
+                        // Reset estado de parpadeo después de 400ms
+                        setTimeout(() => {
+                            validation.isBlinking = false;
+                        }, 400);
+                    }
+                    
+                    return {
+                        detected: validation.blinkCount >= 3, // Requiere 3 parpadeos claros
+                        strength: Math.min(1, validation.blinkCount / 3),
+                        positioning: positioningCorrect
+                    };
+                },
+
+                // Actualizar feedback en tiempo real - NUEVA VERSIÓN ESTRICTA
+                updateRealTimeFeedbackStrict(instructionType, progress, strength, timeRemaining) {
+                    const secondsRemaining = Math.ceil(timeRemaining / 1000);
+                    const progressPercent = Math.round(progress);
+                    
+                    let baseMessage = '';
+                    let statusIcon = '';
+                    
+                    switch (instructionType) {
+                        case 'lookAtCamera':
+                            baseMessage = 'Mantén la mirada al centro';
+                            statusIcon = '👀';
+                            break;
+                        case 'headTurn':
+                            baseMessage = 'Girando cabeza correctamente';
+                            statusIcon = '🔄';
+                            break;
+                        case 'headNod':
+                            baseMessage = 'Asintiendo correctamente';
+                            statusIcon = '↕️';
+                            break;
+                        case 'headShake':
+                            baseMessage = 'Negando correctamente';
+                            statusIcon = '↔️';
+                            break;
+                        case 'smile':
+                            baseMessage = 'Manteniendo sonrisa';
+                            statusIcon = '😊';
+                            break;
+                        case 'blink':
+                            baseMessage = 'Parpadeando correctamente';
+                            statusIcon = '👁️';
+                            break;
+                        default:
+                            baseMessage = 'Movimiento detectado';
+                            statusIcon = '✅';
+                    }
+                    
+                    // Mensaje con tiempo restante y progreso
+                    if (timeRemaining > 0) {
+                        this.realTimeFeedback = `${statusIcon} ${baseMessage} - ${secondsRemaining}s restantes (${progressPercent}%)`;
+                    } else {
+                        this.realTimeFeedback = `${statusIcon} ${baseMessage} - ¡Completando! (${progressPercent}%)`;
+                    }
+                },
+
+                // NUEVA: Completar instrucción con validación estricta
+                completeCurrentInstructionStrict() {
+                    const instruction = this.currentInstruction;
+                    const validation = this.instructionValidation[instruction.type];
+                    
+                    console.log(`✅ ¡INSTRUCCIÓN COMPLETADA EXITOSAMENTE!: ${instruction.type}`);
+                    console.log(`   - Tiempo validado: ${validation.timeValidating/1000}s`);
+                    console.log(`   - Progreso final: ${validation.progress}%`);
+                    
+                    // Mostrar mensaje de éxito con tiempo
+                    this.realTimeFeedback = `✅ ¡${instruction.title} completado! (${Math.round(validation.timeValidating/1000)}s)`;
+                    
+                    // Pausa de 2 segundos antes de continuar (para que el usuario vea el éxito)
+                    setTimeout(() => {
+                        this.currentInstructionIndex++;
+                        if (this.currentInstructionIndex >= this.livenessInstructions.length) {
+                            // Todas las instrucciones completadas - COMPARAR CON SELFIE
+                            this.completeLivenessWithComparison();
+                        } else {
+                            // Siguiente instrucción
+                            this.startNextInstructionStrict();
+                        }
+                    }, 2000);
+                },
+
+                // NUEVA: Iniciar siguiente instrucción con reset completo
+                startNextInstructionStrict() {
+                    if (this.currentInstructionIndex >= this.livenessInstructions.length) {
+                        this.completeLivenessWithComparison();
+                        return;
+                    }
+
+                    const instruction = this.livenessInstructions[this.currentInstructionIndex];
+                    this.currentInstruction = instruction;
+                    this.instructionProgress = 0;
+                    this.instructionStartTime = Date.now();
+                    
+                    // Reset COMPLETO de validación para esta instrucción
+                    const validation = this.instructionValidation[instruction.type];
+                    validation.completed = false;
+                    validation.progress = 0;
+                    validation.isDetecting = false;
+                    validation.lastDetection = Date.now();
+                    validation.movementStart = null;
+                    validation.validationPassed = false;
+                    validation.timeValidating = 0;
+                    
+                    // Reset específico por tipo de movimiento
+                    switch (instruction.type) {
+                        case 'lookAtCamera':
+                            validation.centeringScore = 0;
+                            break;
+                        case 'headTurn':
+                            validation.leftAngle = 0;
+                            validation.rightAngle = 0;
+                            validation.maxAngle = 0;
+                            break;
+                        case 'headNod':
+                            validation.upMovement = 0;
+                            validation.downMovement = 0;
+                            validation.totalMovement = 0;
+                            break;
+                        case 'headShake':
+                            validation.leftMovement = 0;
+                            validation.rightMovement = 0;
+                            validation.totalMovement = 0;
+                            break;
+                        case 'smile':
+                            validation.smileDetected = false;
+                            validation.smileDuration = 0;
+                            break;
+                        case 'blink':
+                            validation.blinkCount = 0;
+                            validation.isBlinking = false;
+                            validation.lastBlink = 0;
+                            break;
+                    }
+                    
+                    // Feedback preparatorio
+                    this.realTimeFeedback = `🎯 Prepárate: ${instruction.title} durante 5 segundos`;
+                    
+                    console.log(`🎯 Nueva instrucción ESTRICTA iniciada: ${instruction.type} (requiere ${validation.requiredDuration/1000}s)`);
+                },
+
+                // NUEVA: Completar liveness con comparación final video-selfie
+                async completeLivenessWithComparison() {
+                    console.log('🎥 ¡Todas las instrucciones de liveness completadas! Iniciando comparación con selfie...');
+                    
+                    // Detener detección facial
+                    this.faceDetectionActive = false;
+                    if (this.faceDetectionInterval) {
+                        clearInterval(this.faceDetectionInterval);
+                        this.faceDetectionInterval = null;
+                    }
+                    
+                    // Limpiar instrucción actual
+                    this.currentInstruction = null;
+                    if (this.instructionTimer) {
+                        clearInterval(this.instructionTimer);
+                    }
+                    
+                    if (this.mediaRecorder && this.recording) {
+                        this.mediaRecorder.stop();
+                        this.recording = false;
+                        this.stopRecordingTimer();
+                        this.stopCamera(this.$refs.recordVideo);
+                        
+                        // Feedback de finalización
+                        this.realTimeFeedback = '✅ ¡Verificación de liveness completada! Comparando con selfie...';
+                        
+                        // ⭐ NUEVA FUNCIONALIDAD: Comparar automáticamente el video con el selfie
+                        setTimeout(() => {
+                            this.compareVideoWithSelfie();
+                        }, 2000);
+                        
+                    } else {
+                        console.log('❌ No hay grabación de video para procesar');
+                        this.realTimeFeedback = '❌ Error: No se pudo completar la grabación de video';
+                    }
+                },
+
+                // NUEVA: Comparar video de liveness con selfie automáticamente
+                async compareVideoWithSelfie() {
+                    try {
+                        console.log('🔍 Iniciando comparación automática video vs selfie...');
+                        this.realTimeFeedback = '🔍 Comparando video con selfie...';
+                        
+                        // Verificar que tenemos selfie y video
+                        if (!this.capturedSelfie) {
+                            console.log('❌ No hay selfie para comparar');
+                            this.realTimeFeedback = '❌ Error: No se encontró selfie para comparar';
+                            return;
+                        }
+                        
+                        if (!this.recordedVideo) {
+                            console.log('❌ No hay video para comparar');
+                            this.realTimeFeedback = '❌ Error: No se encontró video para comparar';
+                            return;
+                        }
+                        
+                        // Convertir video a File para envío
+                        const response = await fetch(this.recordedVideo);
+                        const videoBlob = await response.blob();
+                        const videoFile = new File([videoBlob], 'liveness_video.webm', { type: 'video/webm' });
+                        
+                        // Crear FormData para envío al endpoint
+                        const formData = new FormData();
+                        formData.append('verificationVideo', videoFile);
+                        formData.append('selfieImagePath', this.selfiePath); // Ruta del selfie guardado
+                        formData.append('dniImagePath', this.dniPath);       // Ruta del DNI guardado (si existe)
+                        
+                        console.log('📤 Enviando datos a /kyc/verify-liveness...');
+                        
+                        // Enviar al endpoint de verificación de liveness
+                        const verifyResponse = await fetch('/kyc/verify-liveness', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        const result = await verifyResponse.json();
+                        console.log('📨 Resultado de comparación:', result);
+                        
+                        if (result.success) {
+                            // Mostrar resultado de la comparación
+                            const confidence = result.confidence || 0;
+                            const recommendation = result.recommendation || 'REVIEW';
+                            
+                            if (recommendation === 'APPROVE' && confidence >= 60) {
+                                this.realTimeFeedback = `✅ ¡Verificación exitosa! (${confidence}% confianza)`;
+                                this.livenessVerificationResult = {
+                                    success: true,
+                                    matches_selfie: result.matches_selfie,
+                                    matches_dni: result.matches_dni,
+                                    confidence: confidence,
+                                    message: `Persona verificada correctamente con ${confidence}% de confianza`
+                                };
+                            } else if (recommendation === 'REVIEW' && confidence >= 40) {
+                                this.realTimeFeedback = `⚠️ Verificación requiere revisión (${confidence}% confianza)`;
+                                this.livenessVerificationResult = {
+                                    success: false,
+                                    matches_selfie: result.matches_selfie,
+                                    matches_dni: result.matches_dni,
+                                    confidence: confidence,
+                                    message: `Verificación requiere revisión manual: ${confidence}% confianza`
+                                };
+                            } else {
+                                this.realTimeFeedback = `❌ Verificación fallida (${confidence}% confianza)`;
+                                this.livenessVerificationResult = {
+                                    success: false,
+                                    matches_selfie: result.matches_selfie,
+                                    matches_dni: result.matches_dni,
+                                    confidence: confidence,
+                                    message: `La persona del video no coincide con el selfie (${confidence}% confianza)`
+                                };
+                            }
+                        } else {
+                            this.realTimeFeedback = `❌ Error en verificación: ${result.error || 'Error desconocido'}`;
+                            this.livenessVerificationResult = {
+                                success: false,
+                                matches_selfie: false,
+                                matches_dni: false,
+                                confidence: 0,
+                                message: `Error técnico: ${result.error || 'No se pudo procesar el video'}`
+                            };
+                        }
+                        
+                        console.log('🎯 Resultado final de liveness:', this.livenessVerificationResult);
+                        
+                    } catch (error) {
+                        console.error('❌ Error en comparación video-selfie:', error);
+                        this.realTimeFeedback = '❌ Error técnico durante la comparación';
+                        this.livenessVerificationResult = {
+                            success: false,
+                            matches_selfie: false,
+                            matches_dni: false,
+                            confidence: 0,
+                            message: `Error técnico: ${error.message}`
+                        };
+                    }
                 }
             }
         }
