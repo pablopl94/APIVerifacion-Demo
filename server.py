@@ -3,6 +3,7 @@
 API completa para verificación KYC con frontend/backend separation
 """
 from flask import Flask, request, render_template, jsonify, send_from_directory
+from flask_cors import CORS
 import os
 import uuid
 from werkzeug.utils import secure_filename
@@ -37,6 +38,12 @@ app = Flask(__name__,
            template_folder="templates",
            static_folder="static",
            static_url_path="/static")
+
+# Configurar CORS para permitir peticiones desde Flutter Web
+CORS(app, 
+     origins=['http://localhost:65014', 'http://localhost:3000', 'http://127.0.0.1:65014', 'http://localhost:59177', 'http://localhost:60553'],
+     allow_headers=['Content-Type', 'Authorization'],
+     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
 
 # Configuración
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max

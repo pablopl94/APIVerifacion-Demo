@@ -66,7 +66,6 @@ class DNIVerification(Base):
     
     # Metadatos
     created_at = Column(DateTime, default=func.now())
-    processing_time_seconds = Column(Float, nullable=True)
     
     @property
     def is_approved(self):
@@ -117,6 +116,5 @@ class DNIVerification(Base):
                 'country_match': self.document_country_match
             },
             'details': self.details,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'processing_time_seconds': self.processing_time_seconds
+            'created_at': self.created_at.isoformat() if self.created_at else None
         }

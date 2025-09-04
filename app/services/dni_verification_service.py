@@ -47,20 +47,59 @@ class DNIVerificationService:
             verification_data = gpt_analysis.get('verification', {})
             confidence = verification_data.get('overall_confidence', 0)
             gpt_recommendation = verification_data.get('recommendation', 'REVIEW')
-            
-            # Mapear recomendación GPT a VerificationStatus
-            if gpt_recommendation == 'APPROVE' and confidence >= 70:
+
+            # Solo permitir PENDING, ACCEPTED, REJECTED para verificación de DNI
+            # Considerar coincidencia de todos los campos requeridos
+            required_fields = [
+                'name', 'document_number', 'birthdate', 'issue_date', 'expiry_date', 'country'
+            ]
+            data_matches = gpt_analysis.get('data_matches', {})
+            extracted = gpt_analysis.get('extracted_data', {})
+
+            # Refuerzo: comparar explícitamente el número de documento
+            form_document_number = form_data.get('documentNumber', '').strip()
+            extracted_document_number = extracted.get('document_number', '').strip()
+            match_document_number = (
+                data_matches.get('document_number', False)
+                and form_document_number == extracted_document_number
+            )
+
+            # Forzar el valor correcto en data_matches para el resto del flujo
+            data_matches['document_number'] = match_document_number
+
+            all_match = all(data_matches.get(field, False) for field in required_fields)
+
+            if all_match and confidence >= 70 and gpt_recommendation == 'APPROVE':
                 status = VerificationStatus.ACCEPTED
-            elif gpt_recommendation == 'REJECT' or confidence < 30:
-                status = VerificationStatus.REJECTED
             else:
-                status = VerificationStatus.REVIEW
-            
+                status = VerificationStatus.REJECTED
+
+            # --- NUEVO: Asegurar que el usuario existe antes de guardar la verificación ---
+            from app.models.user import User, VerificationStatus as UserVerificationStatus
+            document_number = form_data.get('documentNumber', '')
+            user = db.query(User).filter(User.document_number == document_number).first()
+            if not user:
+                user = User(
+                    document_number=document_number,
+                    first_name=form_data.get('firstName', ''),
+                    last_name=form_data.get('lastName', ''),
+                    nationality=form_data.get('nationality', ''),
+                    birth_date=form_data.get('birthDate', ''),
+                    issue_date=form_data.get('issueDate', ''),
+                    expiry_date=form_data.get('expiryDate', ''),
+                    status=UserVerificationStatus.PENDING
+                )
+                db.add(user)
+                db.commit()
+                db.refresh(user)
+
+            # --- FIN NUEVO ---
+
             # Extraer datos de la respuesta GPT
             extracted = gpt_analysis.get('extracted_data', {})
             data_matches = gpt_analysis.get('data_matches', {})
             document_analysis = gpt_analysis.get('document_analysis', {})
-            
+
             # Crear registro de verificación DNI
             dni_verification = DNIVerification(
                 id=str(uuid.uuid4()),
@@ -115,25 +154,22 @@ class DNIVerificationService:
             db.add(dni_verification)
             db.commit()
             db.refresh(dni_verification)
-            
-            print(f"✅ DNI verification creada: {dni_verification.id} ({status.value}, {confidence}%)")
-            
-            # Si la verificación fue exitosa, crear el usuario
+
+            # Si la verificación fue exitosa, actualizar el usuario con los datos extraídos
             if status == VerificationStatus.ACCEPTED:
-                print("🚀 Verificación exitosa, creando usuario...")
-                
-                # Actualizar FK del document_number correcto (el extraído, no el del formulario)
-                dni_verification.document_number = dni_verification.extracted_document_number
+                print("🚀 Verificación exitosa, actualizando usuario...")
+                user.first_name = dni_verification.extracted_first_name
+                user.last_name = dni_verification.extracted_last_name
+                user.nationality = dni_verification.extracted_nationality
+                user.birth_date = dni_verification.extracted_birth_date
+                user.issue_date = dni_verification.extracted_issue_date
+                user.expiry_date = dni_verification.extracted_expiry_date
+                user.status = UserVerificationStatus.ACCEPTED
                 db.commit()
-                
-                user = UserService.create_user_after_dni_verification(db, dni_verification)
-                if user:
-                    print(f"✅ Usuario creado exitosamente: {user.document_number}")
-                else:
-                    print("⚠️ Error creando usuario tras verificación exitosa")
-            
+                db.refresh(user)
+
+            print(f"✅ DNI verification creada: {dni_verification.id} ({status.value}, {confidence}%)")
             return dni_verification
-            
         except Exception as e:
             print(f"❌ Error creando verificación DNI: {e}")
             db.rollback()

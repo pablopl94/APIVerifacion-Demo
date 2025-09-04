@@ -196,3 +196,30 @@ class UserService:
         except Exception as e:
             print(f"❌ Error listando usuarios: {e}")
             return []
+    
+    @staticmethod
+    def ensure_user_exists_from_form(db: Session, form_data: Dict[str, str]) -> User:
+        """
+        Crea el usuario si no existe, usando los datos del formulario (aunque sean incorrectos).
+        Solo para permitir la inserción en dni_verifications (por la FK).
+        """
+        document_number = form_data.get('documentNumber', '')
+        user = db.query(User).filter(User.document_number == document_number).first()
+        if user:
+            return user
+        # Crear usuario con datos del formulario
+        user = User(
+            document_number=document_number,
+            first_name=form_data.get('firstName', ''),
+            last_name=form_data.get('lastName', ''),
+            nationality=form_data.get('nationality', ''),
+            birth_date=form_data.get('birthDate', ''),
+            issue_date=form_data.get('issueDate', ''),
+            expiry_date=form_data.get('expiryDate', ''),
+            status=VerificationStatus.PENDING
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        print(f"👤 Usuario creado temporalmente para FK: {user.document_number}")
+        return user

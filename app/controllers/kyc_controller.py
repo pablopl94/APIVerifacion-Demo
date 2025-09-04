@@ -111,6 +111,8 @@ def validate_dni():
             dni_image_path=dni_front_path.replace('\\', '/')
         )
         
+
+        # Validación estricta: solo pasa si confianza 100% y datos críticos coinciden
         if not dni_verification:
             return jsonify({
                 "success": False,
@@ -118,6 +120,41 @@ def validate_dni():
                 "confidence": 0,
                 "recommendation": "REJECT"
             }), 500
+
+        if dni_verification.confidence < 100 or not (dni_verification.match_name and dni_verification.match_document_number):
+            error_fields = []
+            if not dni_verification.match_name:
+                error_fields.append("nombre")
+            if not dni_verification.match_document_number:
+                error_fields.append("número de documento")
+            if not dni_verification.match_birth_date:
+                error_fields.append("fecha de nacimiento")
+            if not dni_verification.match_issue_date:
+                error_fields.append("fecha de expedición")
+            if not dni_verification.match_expiry_date:
+                error_fields.append("fecha de caducidad")
+            if not dni_verification.match_nationality:
+                error_fields.append("nacionalidad")
+
+            if error_fields:
+                error_msg = "Los siguientes datos no coinciden con el DNI: " + ", ".join(error_fields) + ". Por favor, revisa y corrige los datos introducidos."
+            else:
+                error_msg = "Error en la verificación. Por favor, revisa los datos introducidos."
+
+            return jsonify({
+                "success": False,
+                "error": error_msg,
+                "confidence": dni_verification.confidence,
+                "recommendation": "REJECT",
+                "data_matches": {
+                    "name": dni_verification.match_name,
+                    "document_number": dni_verification.match_document_number,
+                    "birthdate": dni_verification.match_birth_date,
+                    "issue_date": dni_verification.match_issue_date,
+                    "expiry_date": dni_verification.match_expiry_date,
+                    "country": dni_verification.match_nationality
+                }
+            }), 400
         
         # 5. Preparar respuesta compatible con el original
         response = {
@@ -133,7 +170,16 @@ def validate_dni():
                 "country": dni_verification.match_nationality
             },
             "document_analysis": json.loads(dni_verification.gpt_analysis).get('document_analysis', {}),
-            "extracted_data": dni_verification.extracted_data,
+            "extracted_data": {
+                "first_name": dni_verification.extracted_first_name,
+                "last_name": dni_verification.extracted_last_name,
+                "document_number": dni_verification.extracted_document_number,
+                "nationality": dni_verification.extracted_nationality,
+                "birth_date": dni_verification.extracted_birth_date,
+                "issue_date": dni_verification.extracted_issue_date,
+                "expiry_date": dni_verification.extracted_expiry_date,
+                "full_text": dni_verification.extracted_full_text
+            },
             "extracted_text": json.loads(dni_verification.gpt_analysis).get('extracted_text', ''),
             "details": dni_verification.details,
             "recommendation": "APPROVE" if dni_verification.is_approved else dni_verification.status.value,

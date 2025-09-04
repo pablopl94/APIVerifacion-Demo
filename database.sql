@@ -20,14 +20,16 @@ USE kyc_db;
 
 -- Tabla usuarios
 CREATE TABLE IF NOT EXISTS users (
-    id VARCHAR(36) PRIMARY KEY,
-    document_number VARCHAR(50) UNIQUE NOT NULL,
+    document_number VARCHAR(50) PRIMARY KEY NOT NULL,
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) NOT NULL,
     nationality VARCHAR(10) NOT NULL,
     birth_date VARCHAR(20) NOT NULL,
+    issue_date VARCHAR(20) NOT NULL,
+    expiry_date VARCHAR(20) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    status ENUM('PENDING', 'ACCEPTED', 'REJECTED', 'REVIEW') DEFAULT 'PENDING'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Tabla verificaciones DNI
@@ -69,7 +71,7 @@ CREATE TABLE IF NOT EXISTS dni_verifications (
     
     -- Resultado
     confidence INT DEFAULT 0,
-    status ENUM('PENDING', 'ACCEPTED', 'REJECTED', 'REVIEW') DEFAULT 'PENDING',
+    status ENUM('PENDING', 'ACCEPTED', 'REJECTED') DEFAULT 'PENDING',
     details TEXT,
     dni_image_path VARCHAR(255),
     
@@ -149,5 +151,3 @@ CREATE INDEX idx_video_status ON video_verifications(status);
 
 -- Mostrar tablas creadas
 SHOW TABLES;
-
-SELECT 'Base de datos KYC creada exitosamente!' as mensaje;
