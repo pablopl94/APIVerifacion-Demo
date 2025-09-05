@@ -1,4 +1,4 @@
--- 🗄️ SCRIPT CREACIÓN BASE DE DATOS KYC
+-- SCRIPT CREACIÓN BASE DE DATOS KYC
 -- Ejecutar en MySQL como administrador
 
 -- 1. Crear base de datos
@@ -151,3 +151,4 @@ CREATE INDEX idx_video_status ON video_verifications(status);
 
 -- Mostrar tablas creadas
 SHOW TABLES;
+

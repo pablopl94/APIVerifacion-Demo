@@ -5,6 +5,7 @@ Servicio para verificación de selfies contra documentos de identidad
 
 import os
 import uuid
+import json
 from werkzeug.utils import secure_filename
 from sqlalchemy.orm import Session
 from app.models.selfie_verification import SelfieVerification
@@ -80,12 +81,13 @@ class SelfieVerificationService:
             
             # 5. Crear registro en base de datos
             selfie_verification = SelfieVerification(
-                user_id=user.id,
+                user_id=user.document_number,
                 dni_image_path=dni_image_path,
                 selfie_image_path=selfie_path,
                 face_match=comparison_result.get('face_match', False),
                 confidence_score=comparison_result.get('confidence', 0),
                 analysis_result=json.dumps(comparison_result),
+                fraud_indicators=json.dumps(comparison_result.get('fraud_indicators', [])),
                 recommendation=comparison_result.get('recommendation', 'REVIEW'),
                 technical_details=json.dumps(comparison_result.get('technical_details', {}))
             )
@@ -103,7 +105,7 @@ class SelfieVerificationService:
                 "face_match": comparison_result.get('face_match', False),
                 "confidence": comparison_result.get('confidence', 0),
                 "analysis": comparison_result.get('analysis', 'Sin análisis disponible'),
-                "fraud_indicators": comparison_result.get('fraud_indicators', []),
+                "fraud_indicators": selfie_verification.get_fraud_indicators() if selfie_verification else [],
                 "recommendation": comparison_result.get('recommendation', 'REVIEW'),
                 "selfie_path": selfie_path.replace('\\', '/'),
                 "dni_path": dni_image_path.replace('\\', '/'),
@@ -140,7 +142,7 @@ class SelfieVerificationService:
                 return {"success": False, "error": "Usuario no encontrado"}
             
             verifications = db.query(SelfieVerification).filter(
-                SelfieVerification.user_id == user.id
+                SelfieVerification.document_number == user.document_number
             ).order_by(SelfieVerification.created_at.desc()).all()
             
             return {
@@ -428,16 +430,15 @@ class SelfieVerificationService:
             
             # 3. Crear objeto SelfieVerification
             selfie_verification = SelfieVerification(
-                user_id=user.id,
+                document_number=user.document_number,
                 dni_image_path=dni_image_path,
                 selfie_image_path=selfie_image_path,
                 match_dni=face_match,
                 confidence=int(confidence),
                 analysis_result=comparison_result.get('analysis', ''),
                 status=status,
-                fraud_indicators=comparison_result.get('fraud_indicators', []),
-                technical_details=comparison_result.get('technical_details', {}),
-                details=f"Verificación selfie: {confidence}% confianza, {'Match' if face_match else 'No match'}"
+                fraud_indicators=json.dumps(comparison_result.get('fraud_indicators', [])),
+                details=f"Verificación selfie: {confidence}% confianza, {'Match' if face_match else 'No match'}",
             )
             
             # 4. Guardar en base de datos

@@ -20,9 +20,8 @@ class SelfieVerification(Base):
     document_number = Column(String(50), ForeignKey('users.document_number'), nullable=False)
     user = relationship("User", back_populates="selfie_verification")
     
-    # Relación con la verificación de DNI (referencia)
-    dni_verification_id = Column(String(36), ForeignKey('dni_verifications.id'), nullable=False)
-    dni_verification = relationship("DNIVerification", backref="selfie_verifications")
+    # Ruta de la imagen del DNI
+    dni_image_path = Column(String(255), nullable=True)
     
     # Ruta de la imagen del selfie
     selfie_image_path = Column(String(500), nullable=False)
@@ -34,34 +33,27 @@ class SelfieVerification(Base):
     # Análisis detallado
     analysis_result = Column(Text, nullable=True)
     fraud_indicators = Column(Text, nullable=True)  # JSON array como string
+    def get_fraud_indicators(self):
+        import json
+        try:
+            return json.loads(self.fraud_indicators) if self.fraud_indicators else []
+        except Exception:
+            return []
     
     # Detalles técnicos de DeepFace
-    deepface_distance = Column(Float, nullable=True)
-    deepface_threshold = Column(Float, nullable=True)
-    deepface_model = Column(String(20), nullable=True, default='VGG-Face')
-    detector_backend = Column(String(20), nullable=True, default='opencv')
     
     # Calidad de las imágenes
-    dni_image_quality_score = Column(Integer, nullable=True)  # 0-100
-    selfie_image_quality_score = Column(Integer, nullable=True)  # 0-100
     
     # Caras detectadas
-    faces_detected_dni = Column(Integer, nullable=True, default=0)
-    faces_detected_selfie = Column(Integer, nullable=True, default=0)
-    
+
     # Estado final
     status = Column(Enum(VerificationStatus), default=VerificationStatus.PENDING)
     details = Column(Text, nullable=True)
     
-    # Metadatos
+    # Estado final
     created_at = Column(DateTime, default=func.now())
-    processing_time_seconds = Column(Float, nullable=True)
-    
-    @property
     def is_approved(self):
         """Verificación aprobada si status es ACCEPTED"""
-        return self.status == VerificationStatus.ACCEPTED
-    
     def __repr__(self):
         return f"<SelfieVerification(id='{self.id}', document='{self.document_number}', match={self.match_dni}, confidence={self.confidence}%, status='{self.status.value if self.status else 'None'}')>"
     
@@ -69,31 +61,16 @@ class SelfieVerification(Base):
         return f"<SelfieVerification(id='{self.id}', document='{self.document_number}', match={self.match_dni}, confidence={self.confidence}%, status='{self.status.value if self.status else 'None'}')>"
     
     def to_dict(self):
-        """Convertir a diccionario para JSON responses"""
         return {
             'id': self.id,
             'document_number': self.document_number,
-            'dni_verification_id': self.dni_verification_id,
             'selfie_image_path': self.selfie_image_path,
             'match_dni': self.match_dni,
             'confidence': self.confidence,
             'status': self.status.value if self.status else None,
             'is_approved': self.is_approved,
             'analysis_result': self.analysis_result,
-            'fraud_indicators': self.fraud_indicators,
-            'technical_details': {
-                'deepface_distance': self.deepface_distance,
-                'deepface_threshold': self.deepface_threshold,
-                'deepface_model': self.deepface_model,
-                'detector_backend': self.detector_backend,
-                'dni_image_quality': self.dni_image_quality_score,
-                'selfie_image_quality': self.selfie_image_quality_score,
-                'faces_detected': {
-                    'dni': self.faces_detected_dni,
-                    'selfie': self.faces_detected_selfie
-                }
-            },
+            'fraud_indicators': self.get_fraud_indicators(),
             'details': self.details,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'processing_time_seconds': self.processing_time_seconds
+            'created_at': self.created_at.isoformat() if self.created_at else None
         }

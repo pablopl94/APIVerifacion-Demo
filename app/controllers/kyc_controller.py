@@ -320,7 +320,7 @@ def verify_selfie():
                 "face_match": selfie_verification.match_dni,
                 "confidence": selfie_verification.confidence,
                 "analysis": selfie_verification.analysis_result,
-                "fraud_indicators": selfie_verification.fraud_indicators,
+                "fraud_indicators": selfie_verification.get_fraud_indicators(),
                 "recommendation": "APPROVE" if selfie_verification.is_approved else selfie_verification.status.value,
                 "selfie_path": selfie_path.replace('\\', '/'),
                 "dni_path": dni_image_path.replace('\\', '/'),
