@@ -40,10 +40,11 @@ app = Flask(__name__,
            static_url_path="/static")
 
 # Configurar CORS para permitir peticiones desde Flutter Web
+from flask_cors import CORS
 CORS(app, 
-     origins=['http://localhost:65014', 'http://localhost:3000', 'http://127.0.0.1:65014', 'http://localhost:59177', 'http://localhost:60553'],
-     allow_headers=['Content-Type', 'Authorization'],
-     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
+    origins='*',  # Permitir cualquier origen (web, APK, producción)
+    allow_headers=['Content-Type', 'Authorization'],
+    methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
 
 # Configuración
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max
